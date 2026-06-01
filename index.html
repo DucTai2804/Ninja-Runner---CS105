@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Đồ án ĐHMT - Ninja Runner</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-family: sans-serif;
+            text-shadow: 1px 1px 2px black;
+            pointer-events: none;
+        }
+    </style>
+</head>
+
+<body>
+    <button id="btnPause"
+        style="position: absolute; top: 20px; right: 20px; padding: 10px 20px; background-color: #ffc107; font-weight: bold; border-radius: 8px; border: none; cursor: pointer; z-index: 10;">Tạm
+        Dừng ⏸️</button>
+    <div id="fpsCounter"
+        style="position: absolute; top: 60px; right: 20px; color: #00ff00; font-weight: bold; font-family: monospace; font-size: 18px; text-shadow: 1px 1px 2px black; z-index: 10;">
+        FPS: 0</div>
+
+    <!-- Giao diện Điểm số và Tiền vàng -->
+    <div
+        style="position: absolute; top: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 40px; z-index: 10; font-family: 'Impact', sans-serif; pointer-events: none;">
+        <div style="text-align: center;">
+            <div style="color: #f1c40f; font-size: 18px; text-shadow: 2px 2px 4px black; letter-spacing: 2px;">SCORE
+            </div>
+            <div id="scoreUI" style="color: white; font-size: 36px; text-shadow: 2px 2px 4px black;">0</div>
+        </div>
+        <div style="text-align: center;">
+            <div style="color: #f1c40f; font-size: 18px; text-shadow: 2px 2px 4px black; letter-spacing: 2px;">COINS
+            </div>
+            <div id="coinUI" style="color: #f1c40f; font-size: 36px; text-shadow: 2px 2px 4px black;">0 🪙</div>
+        </div>
+    </div>
+    <!-- Thanh thời gian Susanoo -->
+    <div id="susanooBarContainer" style="display: none; position: absolute; top: 90px; left: 50%; transform: translateX(-50%); width: 300px; height: 15px; background: rgba(0,0,0,0.6); border: 2px solid #a832a8; border-radius: 10px; z-index: 10; pointer-events: none; overflow: hidden; box-shadow: 0 0 15px #a832a8, inset 0 0 5px black;">
+        <div id="susanooBarInner" style="width: 100%; height: 100%; background: linear-gradient(90deg, #6a1b9a, #d500f9, #ea80fc); border-radius: 8px; box-shadow: inset 0 0 10px rgba(255,255,255,0.5); transform-origin: left; transform: scaleX(1);"></div>
+    </div>
+
+    <button id="btnToggleTrees"
+        style="position: absolute; top: 100px; right: 20px; padding: 10px 20px; background-color: #28a745; color: white; font-weight: bold; border-radius: 8px; border: none; cursor: pointer; z-index: 10;">Ẩn
+        Núi ⛰️</button>
+
+    <div
+        style="position: absolute; top: 150px; right: 20px; z-index: 10; background: rgba(0,0,0,0.6); padding: 10px; border-radius: 8px; color: white; font-family: sans-serif; display: flex; flex-direction: column; gap: 10px;">
+        <label for="practiceMode" style="font-weight: bold;">🎯 Luyện tập:</label>
+        <select id="practiceMode" style="padding: 5px; border-radius: 5px; cursor: pointer;">
+            <option value="0">Ngẫu nhiên (Mặc định)</option>
+            <option value="1">Mẫu 1: Đá rơi 1 làn</option>
+            <option value="2">Mẫu 2: Tường đá kép</option>
+            <option value="3">Mẫu 3: Ziczac chéo</option>
+            <option value="4">Mẫu 4: Phi tiêu tầm cao</option>
+            <option value="5">Mẫu 5: Lách khe hẹp</option>
+            <option value="6">Mẫu 6: Thiên thạch lở</option>
+            <option value="7">Mẫu 7: Đá khổng lồ (Ép trượt)</option>
+            <option value="8">Mẫu 8: Đá khổng lồ (Ép nhảy)</option>
+            <option value="9">Mẫu 9: Cột gỗ + Phi tiêu chìm</option>
+        </select>
+    </div>
+    <div id="info">
+        <h3>Ninja Runner - Đồ án ĐHMT</h3>
+        <p>Phím trái/phải: Di chuyển</p>
+        <p>Phím 1: Đại hỏa cầu</p>
+        <p>Phím 2: Chidori (Xuyên phá)</p>
+        <p>Phím 3: Susanoo (Bất tử 5s)</p>
+    </div>
+
+    <!-- Màn hình hiển thị khi thua game -->
+    <div id="gameOverUI"
+        style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: none; color: #ff3333; font-family: sans-serif; text-align: center; justify-content: center; align-items: center; flex-direction: column; z-index: 100; pointer-events: none;">
+        <h1
+            style="font-size: 6rem; text-shadow: 2px 2px 5px black, 0px 0px 20px red; margin-bottom: 10px; margin-top: 0;">
+            GAME OVER</h1>
+        <p
+            style="color: white; font-size: 1.5rem; text-shadow: 1px 1px 4px black, 0px 0px 10px red; margin-bottom: 30px; font-weight: bold;">
+            Bạn đã đâm trúng vật cản rùi kìa!</p>
+        <button onclick="resetGame()"
+            style="pointer-events: auto; padding: 15px 40px; font-size: 1.5rem; cursor: pointer; background: #dc3545; color: white; border: 2px solid white; border-radius: 10px; font-weight: bold; box-shadow: 0 4px 8px rgba(0,0,0,0.5);">Chơi
+            Lại (Backspace)</button>
+    </div>
+
+    <!-- Load Three.js core -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Load GLTFLoader để đọc file .glb -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- Load OBB để tính toán va chạm nghiêng chính xác 100% -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/math/OBB.js"></script>
+    <!-- File logic game của bạn -->
+    <script src="main.js"></script>
+</body>
+
+</html>
