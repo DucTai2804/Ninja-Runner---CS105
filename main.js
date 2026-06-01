@@ -67,6 +67,31 @@ dirLight.shadow.bias = -0.0005;
 scene.add(dirLight);
 
 // ==========================================
+// THÔNG SỐ CHU KỲ NGÀY ĐÊM
+// ==========================================
+const DAY_COLORS = {
+    background: new THREE.Color(0x88aacc),
+    ambient: new THREE.Color(0xffffff),
+    hemiSky: new THREE.Color(0xffffff),
+    hemiGround: new THREE.Color(0x445544),
+    dir: new THREE.Color(0xffeedd),
+    ambientIntensity: 0.4,
+    hemiIntensity: 0.4,
+    dirIntensity: 1.5
+};
+
+const NIGHT_COLORS = {
+    background: new THREE.Color(0x050510),
+    ambient: new THREE.Color(0x444466),
+    hemiSky: new THREE.Color(0x222244),
+    hemiGround: new THREE.Color(0x111122),
+    dir: new THREE.Color(0x5566aa),
+    ambientIntensity: 0.15,
+    hemiIntensity: 0.15,
+    dirIntensity: 0.4
+};
+
+// ==========================================
 // 3. TẢI TEXTURE (Vật liệu bề mặt)
 // ==========================================
 const textureLoader = new THREE.TextureLoader();
@@ -1448,6 +1473,33 @@ function animate() {
     requestAnimationFrame(animate);
     let delta = clock.getDelta();
     if (delta > 0.1) delta = 0.1;
+
+    // --- CẬP NHẬT CHU KỲ NGÀY/ĐÊM ---
+    let timeModeEl = document.getElementById('timeMode');
+    let mode = timeModeEl ? timeModeEl.value : 'auto';
+    let isNight = false;
+    
+    if (mode === 'auto') {
+        let cycle = gameScore % 30000;
+        isNight = (cycle >= 20000);
+    } else {
+        isNight = (mode === 'night');
+    }
+
+    let targetColors = isNight ? NIGHT_COLORS : DAY_COLORS;
+    let lerpSpeed = delta * 0.5; // Tốc độ chuyển đổi màu (mượt mà)
+
+    scene.background.lerp(targetColors.background, lerpSpeed);
+    if (scene.fog) scene.fog.color.lerp(targetColors.background, lerpSpeed);
+    ambientLight.color.lerp(targetColors.ambient, lerpSpeed);
+    ambientLight.intensity += (targetColors.ambientIntensity - ambientLight.intensity) * lerpSpeed;
+    
+    hemiLight.color.lerp(targetColors.hemiSky, lerpSpeed);
+    hemiLight.groundColor.lerp(targetColors.hemiGround, lerpSpeed);
+    hemiLight.intensity += (targetColors.hemiIntensity - hemiLight.intensity) * lerpSpeed;
+    
+    dirLight.color.lerp(targetColors.dir, lerpSpeed);
+    dirLight.intensity += (targetColors.dirIntensity - dirLight.intensity) * lerpSpeed;
 
     // --- CẬP NHẬT ANIMATION NGAY ĐẦU VÒNG LẶP ---
     if (mixer) {

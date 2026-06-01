@@ -59,6 +59,14 @@
 
     <div
         style="position: absolute; top: 150px; right: 20px; z-index: 10; background: rgba(0,0,0,0.6); padding: 10px; border-radius: 8px; color: white; font-family: sans-serif; display: flex; flex-direction: column; gap: 10px;">
+        
+        <label for="timeMode" style="font-weight: bold;">🌞 Thời gian:</label>
+        <select id="timeMode" style="padding: 5px; border-radius: 5px; cursor: pointer;">
+            <option value="auto">Tự động (Theo điểm)</option>
+            <option value="day">Trời sáng</option>
+            <option value="night">Trời tối</option>
+        </select>
+
         <label for="practiceMode" style="font-weight: bold;">🎯 Luyện tập:</label>
         <select id="practiceMode" style="padding: 5px; border-radius: 5px; cursor: pointer;">
             <option value="0">Ngẫu nhiên (Mặc định)</option>
