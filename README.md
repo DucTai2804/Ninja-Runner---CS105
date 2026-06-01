@@ -14,7 +14,9 @@ Trò chơi được xây dựng trên nền tảng WebGL thông qua thư viện 
 ---
 
 ## 🎮 Cách chơi (Controls)
-* **Di chuyển:** Sử dụng các phím mũi tên **Trái (Left)** / **Phải (Right)** hoặc phím **A** / **D** để di chuyển Ninja tránh chướng ngại vật.
+* **Di chuyển qua lại:** Sử dụng các phím mũi tên **Trái (Left)** / **Phải (Right)** hoặc phím **A** / **D** để chuyển làn đường (Trái, Giữa, Phải).
+* **Nhảy (Jump):** Sử dụng phím mũi tên **Lên (Up)** hoặc phím **W** để nhảy lên né các chướng ngại vật tầm thấp (đá nhỏ, phi tiêu chìm...).
+* **Trượt (Slide):** Sử dụng phím mũi tên **Xuống (Down)** hoặc phím **S** để trượt người xuống né các vật cản trên cao (phi tiêu tầm cao, đá khổng lồ treo cao...).
 * **Kích hoạt Kỹ năng:**
   * **Phím 1:** **Đại Hỏa Cầu (Fireball)** 🔥 - Bắn ra quả cầu lửa tiêu diệt các vật cản phía trước.
   * **Phím 2:** **Chidori (Thiên Điểu)** ⚡ - Tăng tốc lướt xuyên phá vật cản trong tích tắc.
