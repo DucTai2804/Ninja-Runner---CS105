@@ -30,6 +30,8 @@ const controls = new THREE.OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 // Ngẩng ống kính và quét thẳng về phía chân trời (-15m) để nhìn được đường chạy phía xa
 controls.target.set(0, 2.5, -15);
+let susanooMaterialsList = [];
+
 // ==========================================
 // 2. HỆ THỐNG CHIẾU SÁNG & BÓNG ĐỔ (Đã nâng cấp)
 // ==========================================
@@ -81,14 +83,14 @@ const DAY_COLORS = {
 };
 
 const NIGHT_COLORS = {
-    background: new THREE.Color(0x050510),
-    ambient: new THREE.Color(0x444466),
-    hemiSky: new THREE.Color(0x222244),
-    hemiGround: new THREE.Color(0x111122),
-    dir: new THREE.Color(0x5566aa),
-    ambientIntensity: 0.15,
-    hemiIntensity: 0.15,
-    dirIntensity: 0.4
+    background: new THREE.Color(0x1a2235), // Xanh đêm sáng mờ (thay vì đen kịt)
+    ambient: new THREE.Color(0x7788aa), // Tăng màu ambient để thấy rõ vách núi
+    hemiSky: new THREE.Color(0x556688),
+    hemiGround: new THREE.Color(0x223344),
+    dir: new THREE.Color(0x88aadd), // Trăng sáng xanh
+    ambientIntensity: 0.4, // Giữ bằng ban ngày để không bị mù
+    hemiIntensity: 0.4, // Giữ bằng ban ngày
+    dirIntensity: 0.7 // Trăng dịu hơn nắng (1.5)
 };
 
 // ==========================================
@@ -334,6 +336,12 @@ window.katonAudio = katonAudio;
 const chidoriAudio = new Audio('audios/chidori.mp4');
 chidoriAudio.volume = 1.0;
 window.chidoriAudio = chidoriAudio;
+
+// Âm thanh Susanoo Fly
+const susanooFlyAudio = new Audio('audios/susanoo_fly.mp4');
+susanooFlyAudio.volume = 0.8;
+susanooFlyAudio.loop = true; // Trạng thái bay lơ lửng lặp lại
+window.susanooFlyAudio = susanooFlyAudio;
 
 // ==========================================
 // TẠO HIỆU ỨNG CHIDORI
@@ -1031,6 +1039,163 @@ gltfLoader.load('models/Dangers/true_shuriken_scale.glb', function (gltf) {
     console.log("Đã trang bị xong hệ thống Phi tiêu Tử thần!");
 });
 
+// ==========================================
+// SHADER VẬT LIỆU SUSANOO (CÓ HỖ TRỢ SKINNING)
+// ==========================================
+// Tối ưu hoá: Đóng gói và tách riêng Material của Thân và Kiếm để giảm tải tính toán cho GPU
+
+// 1. MATERIAL CHO THÂN SUSANOO (Sử dụng Noise, bỏ qua logic của kiếm)
+const susanooBodyMaterial = new THREE.ShaderMaterial({
+    uniforms: {
+        time: { value: 0.0 },
+        color1: { value: new THREE.Color(0xa866ff) }, // Tím thanh (pastel/lavender)
+        color2: { value: new THREE.Color(0xffffff) }, // Trắng lõi
+        blenderMap: { value: null },
+        hasMap: { value: 0.0 }
+    },
+    vertexShader: `
+        #include <common>
+        #include <skinning_pars_vertex>
+        
+        varying vec3 vWorldPos;
+        varying vec3 vViewDir;
+        varying vec3 vNorm;
+        varying vec2 vUv;
+
+        void main() {
+            vUv = uv;
+            #include <skinbase_vertex>
+            #include <beginnormal_vertex>
+            #include <skinnormal_vertex>
+            #include <defaultnormal_vertex>
+            
+            vNorm = normalize(transformedNormal);
+            
+            #include <begin_vertex>
+            #include <skinning_vertex>
+            #include <project_vertex>
+            
+            vec4 worldPosition = modelMatrix * vec4(transformed, 1.0);
+            vWorldPos = worldPosition.xyz;
+            vViewDir = normalize(cameraPosition - vWorldPos);
+        }
+    `,
+    fragmentShader: `
+        uniform float time;
+        uniform vec3 color1;
+        uniform vec3 color2;
+        uniform sampler2D blenderMap;
+        uniform float hasMap;
+        
+        varying vec3 vWorldPos;
+        varying vec3 vViewDir;
+        varying vec3 vNorm;
+        varying vec2 vUv;
+
+        float hash(vec3 p) {
+            p = fract(p * 0.3183099 + .1);
+            p *= 17.0;
+            return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+        }
+        float noise(vec3 x) {
+            vec3 i = floor(x);
+            vec3 f = fract(x);
+            f = f * f * (3.0 - 2.0 * f);
+            return mix(mix(mix(hash(i + vec3(0,0,0)), hash(i + vec3(1,0,0)), f.x),
+                           mix(hash(i + vec3(0,1,0)), hash(i + vec3(1,1,0)), f.x), f.y),
+                       mix(mix(hash(i + vec3(0,0,1)), hash(i + vec3(1,0,1)), f.x),
+                           mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), f.x), f.y), f.z);
+        }
+
+        void main() {
+            vec3 normal = normalize(vNorm);
+            vec3 viewDir = normalize(vViewDir);
+            float fresnel = 1.0 - max(dot(viewDir, normal), 0.0);
+            fresnel = pow(fresnel, 2.0);
+            
+            vec4 texColor = vec4(1.0);
+            if (hasMap > 0.5) texColor = texture2D(blenderMap, vUv);
+            
+            float n1 = noise(vWorldPos * 0.8 + vec3(0.0, -time * 3.0, 0.0));
+            float n2 = noise(vWorldPos * 1.6 + vec3(time * 1.5, -time * 6.0, 0.0));
+            float intensity = smoothstep(0.3, 0.8, n1 * 0.6 + n2 * 0.4);
+            
+            vec3 finalColor = mix(color1, color2, intensity) + color1 * fresnel;
+            
+            if (hasMap > 0.5) {
+                finalColor *= texColor.rgb * 1.5;
+            }
+            
+            gl_FragColor = vec4(finalColor, 0.85);
+        }
+    `,
+    blending: THREE.NormalBlending,
+    depthWrite: true,
+    transparent: false,
+    side: THREE.DoubleSide
+});
+
+// 2. MATERIAL CHO KIẾM (Chỉ xử lý lõi sáng, bỏ qua noise nặng nề để tiết kiệm GPU)
+const susanooSwordMaterial = new THREE.ShaderMaterial({
+    uniforms: {
+        color2: { value: new THREE.Color(0xffffff) }, // Trắng lõi
+        colorEdge: { value: new THREE.Color(0xd099ff) }, // Tím nhạt ở viền
+        blenderMap: { value: null },
+        hasMap: { value: 0.0 }
+    },
+    vertexShader: `
+        #include <common>
+        #include <skinning_pars_vertex>
+        
+        varying vec3 vViewDir;
+        varying vec3 vNorm;
+        varying vec2 vUv;
+
+        void main() {
+            vUv = uv;
+            #include <skinbase_vertex>
+            #include <beginnormal_vertex>
+            #include <skinnormal_vertex>
+            #include <defaultnormal_vertex>
+            
+            vNorm = normalize(transformedNormal);
+            
+            #include <begin_vertex>
+            #include <skinning_vertex>
+            #include <project_vertex>
+            
+            vec4 worldPosition = modelMatrix * vec4(transformed, 1.0);
+            vViewDir = normalize(cameraPosition - worldPosition.xyz);
+        }
+    `,
+    fragmentShader: `
+        uniform vec3 color2;
+        uniform vec3 colorEdge;
+        uniform sampler2D blenderMap;
+        uniform float hasMap;
+        
+        varying vec3 vViewDir;
+        varying vec3 vNorm;
+        varying vec2 vUv;
+
+        void main() {
+            vec3 normal = normalize(vNorm);
+            vec3 viewDir = normalize(vViewDir);
+            float fresnel = 1.0 - max(dot(viewDir, normal), 0.0);
+            
+            float f = pow(fresnel, 1.5); 
+            float core = smoothstep(0.6, 0.0, f);
+            vec3 finalColor = color2 * core * 1.5 + colorEdge * f * 0.5;
+            
+            gl_FragColor = vec4(finalColor, 0.95);
+        }
+    `,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    side: THREE.DoubleSide
+});
+
 // --- LOAD MODEL SUSANOO ---
 gltfLoader.load('models/Characters/sasuke/susanoo_animation.glb', function (gltf) {
     susanooModel = gltf.scene;
@@ -1049,6 +1214,42 @@ gltfLoader.load('models/Characters/sasuke/susanoo_animation.glb', function (gltf
     // Nếu muốn đổi hướng, bạn có thể chỉnh thành 0, hoặc Math.PI / 2 (90 độ), -Math.PI / 2...
     susanooModel.rotation.y = Math.PI;
     // ==========================================
+
+    // Gắn Shader vào các thành phần của Susanoo
+    susanooModel.traverse(function (child) {
+        if (child.isMesh) {
+            let name = child.name;
+            let mat;
+
+            // Phân biệt thân và kiếm
+            if (name === '5_MadaraPerfectSusanoo:Sword_0_0_0.001' || name === '7_Flames_0.1_16_16') {
+                mat = susanooSwordMaterial.clone();
+                // Bắt buộc phải sao chép sâu Uniforms để không bị dính chung trạng thái giữa các bộ phận
+                mat.uniforms = THREE.UniformsUtils.clone(susanooSwordMaterial.uniforms);
+            } else {
+                mat = susanooBodyMaterial.clone();
+                mat.uniforms = THREE.UniformsUtils.clone(susanooBodyMaterial.uniforms);
+            }
+
+            // Bật tính năng Skinning nếu đây là SkinnedMesh
+            if (child.isSkinnedMesh) mat.skinning = true;
+
+            // TRUYỀN TEXTURE BLENDER VÀO SHADER
+            if (child.material && child.material.map) {
+                mat.uniforms.blenderMap.value = child.material.map;
+                mat.uniforms.hasMap.value = 1.0;
+            }
+
+            child.material = mat;
+            susanooMaterialsList.push(mat);
+
+            // Không cho Susanoo nhận hay đổ bóng
+            child.castShadow = false;
+            child.receiveShadow = false;
+        }
+    });
+
+
 
     sasuke.add(susanooModel); // Gắn trực tiếp vào Sasuke
 
@@ -1231,6 +1432,10 @@ window.resetGame = function () {
     if (susanooBarContainer) susanooBarContainer.style.display = 'none';
     if (susanooModel) susanooModel.visible = false;
     if (susanooMixer) susanooMixer.stopAllAction();
+    if (window.susanooFlyAudio) {
+        window.susanooFlyAudio.pause();
+        window.susanooFlyAudio.currentTime = 0;
+    }
 
     // --- RESET ĐIỂM SỐ & TIỀN VÀNG ---
     gameScore = 0;
@@ -1419,6 +1624,12 @@ document.addEventListener('keydown', (event) => {
             susanooTransformTimer = 0.1; // Chờ 0.1s rồi bung luồng khí (không ẩn Sasuke)
             cameraTransitionTime = 1.0; // Bắt đầu chuyển đổi góc camera (1 giây)
 
+            // Phát âm thanh bay
+            if (window.susanooFlyAudio) {
+                window.susanooFlyAudio.currentTime = 0;
+                window.susanooFlyAudio.play().catch(e => console.log("Lỗi phát audio susanoo:", e));
+            }
+
             // Hiện các ngọn núi khổng lồ
             if (treeInstancedMeshes.length >= 4) {
                 treeInstancedMeshes[0].mesh.visible = true;
@@ -1478,7 +1689,7 @@ function animate() {
     let timeModeEl = document.getElementById('timeMode');
     let mode = timeModeEl ? timeModeEl.value : 'auto';
     let isNight = false;
-    
+
     if (mode === 'auto') {
         let cycle = gameScore % 30000;
         isNight = (cycle >= 20000);
@@ -1493,11 +1704,11 @@ function animate() {
     if (scene.fog) scene.fog.color.lerp(targetColors.background, lerpSpeed);
     ambientLight.color.lerp(targetColors.ambient, lerpSpeed);
     ambientLight.intensity += (targetColors.ambientIntensity - ambientLight.intensity) * lerpSpeed;
-    
+
     hemiLight.color.lerp(targetColors.hemiSky, lerpSpeed);
     hemiLight.groundColor.lerp(targetColors.hemiGround, lerpSpeed);
     hemiLight.intensity += (targetColors.hemiIntensity - hemiLight.intensity) * lerpSpeed;
-    
+
     dirLight.color.lerp(targetColors.dir, lerpSpeed);
     dirLight.intensity += (targetColors.dirIntensity - dirLight.intensity) * lerpSpeed;
 
@@ -1507,6 +1718,13 @@ function animate() {
     }
     if (susanooMixer) {
         susanooMixer.update(delta);
+    }
+
+    // Cập nhật biến thời gian cho Shader của Susanoo
+    if (susanooMaterialsList) {
+        susanooMaterialsList.forEach(mat => {
+            mat.uniforms.time.value += delta;
+        });
     }
 
     // Đo FPS
@@ -1570,6 +1788,12 @@ function animate() {
             if (susanooMixer) susanooMixer.stopAllAction();
             createFlameBlast(); // Bùng nổ lửa tím trắng xóa khi hết Susanoo
             cameraTransitionTime = 1.0; // Bắt đầu chuyển đổi góc camera về Sasuke
+
+            // Tắt âm thanh bay
+            if (window.susanooFlyAudio) {
+                window.susanooFlyAudio.pause();
+                window.susanooFlyAudio.currentTime = 0;
+            }
 
             // Ẩn các ngọn núi khổng lồ
             if (treeInstancedMeshes.length >= 4) {
