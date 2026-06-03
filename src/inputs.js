@@ -81,7 +81,7 @@ export function setupInputs() {
 
         // Tạm dừng (Pause) - Phím Space
         if (event.key === ' ' || event.code === 'Space') {
-            event.preventDefault(); // Tránh cuộn trang
+            event.preventDefault(); // Xử lý nút PAUSE trên UI
             let btnPause = document.getElementById('btnPause');
             if (btnPause) {
                 btnPause.click(); // Giả lập click nút Tạm Dừng
@@ -185,6 +185,18 @@ export function setupInputs() {
                     if (flyAnim && susanooAnimations[flyAnim]) {
                         susanooAnimations[flyAnim].fadeOut(0.1);
                     }
+                    
+                    // Nhúng (Duck) âm thanh bay xuống mức 10% (0.1) cực nhanh (100ms) để nhường chỗ cho tiếng chém
+                    if (window.susanooFlyAudio && window.fadeToVolume) {
+                        window.fadeToVolume(window.susanooFlyAudio, 0.1, 100);
+                    }
+
+                    // Phát âm thanh chém kiếm (Dùng cloneNode để có thể phát đè nhiều âm thanh mượt mà không bị cắt tiếng ngang)
+                    if (window.susanooSlashAudio) {
+                        let slashSfx = window.susanooSlashAudio.cloneNode();
+                        slashSfx.volume = window.susanooSlashAudio.volume;
+                        slashSfx.play().catch(e => console.log(e));
+                    }
                 }
             }
         }
@@ -245,6 +257,65 @@ export function setupInputs() {
         }
     }, { passive: true });
 
-    // --- MENU CHẾ ĐỘ LUYỆN TẬP ---
+// --- MENU CHẾ ĐỘ LUYỆN TẬP ---
     // Đã được xử lý ở main.js để tránh xung đột
+}
+
+// Bắt đầu game luôn ở trạng thái Pause để chờ màn hình Start Menu
+state.isPaused = true;
+
+// Xử lý nút Bắt Đầu Game (Start Menu)
+const startMenuUI = document.getElementById('startMenuUI');
+const btnStartGame = document.getElementById('btnStartGame');
+if (btnStartGame && startMenuUI) {
+    btnStartGame.addEventListener('click', () => {
+        // 1. Ẩn màn hình Menu
+        startMenuUI.style.display = 'none';
+        
+        // 2. Mở khóa game (Bỏ Pause)
+        state.isPaused = false;
+        isPaused = false;
+        
+        // 3. Bật nhạc nền (đảm bảo chắc chắn chạy được vì đã có thao tác click)
+        if (window.bgmAudio) {
+            window.bgmAudio.play().catch(e => console.log("Lỗi bật nhạc nền:", e));
+        }
+    });
+}
+
+// Xử lý nút PAUSE trên UI (Góc phải)
+let isPaused = state.isPaused;
+export const btnPause = document.getElementById('btnPause');
+if (btnPause) {
+    btnPause.addEventListener('click', () => {
+        // Không cho phép dùng nút Pause nếu chưa ấn Start Game
+        if (startMenuUI && startMenuUI.style.display !== 'none') return;
+        
+        isPaused = !isPaused;
+        state.isPaused = isPaused;
+        btnPause.innerText = isPaused ? "▶ Tiếp tục" : "⏸ Tạm dừng";
+        
+        // Dừng/Tiếp tục nhạc nền theo trạng thái Game
+        if (window.bgmAudio) {
+            if (isPaused) {
+                window.bgmAudio.pause();
+            } else {
+                window.bgmAudio.play().catch(e => console.log(e));
+            }
+        }
+    });
+}
+
+// Xử lý nút Mute nhạc nền
+export const btnMuteBGM = document.getElementById('btnMuteBGM');
+let isMuted = false;
+if (btnMuteBGM) {
+    btnMuteBGM.addEventListener('click', () => {
+        if (window.bgmAudio) {
+            isMuted = !isMuted;
+            window.bgmAudio.muted = isMuted;
+            btnMuteBGM.innerText = isMuted ? "Bật Nhạc 🔇" : "Tắt Nhạc 🔊";
+            btnMuteBGM.style.backgroundColor = isMuted ? "#dc3545" : "#17a2b8";
+        }
+    });
 }

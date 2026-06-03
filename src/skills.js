@@ -638,10 +638,9 @@ export function updateSkills(delta) {
             import('./main.js').then(m => m.createFlameBlast()); // Bùng nổ lửa tím trắng xóa khi hết Susanoo
             state.cameraTransitionTime = 1.0; // Bắt đầu chuyển đổi góc camera về Sasuke
 
-            // Tắt âm thanh bay
-            if (window.susanooFlyAudio) {
-                window.susanooFlyAudio.pause();
-                window.susanooFlyAudio.currentTime = 0;
+            // Tắt âm thanh bay mượt mà (Có pause)
+            if (window.susanooFlyAudio && window.fadeToVolume) {
+                window.fadeToVolume(window.susanooFlyAudio, 0, 150, true);
             }
 
             // Ẩn các ngọn núi khổng lồ

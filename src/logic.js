@@ -34,9 +34,8 @@ export function resetGame() {
     if (susanooBarContainer) susanooBarContainer.style.display = 'none';
     if (susanooModel) susanooModel.visible = false;
     if (susanooMixer) susanooMixer.stopAllAction();
-    if (window.susanooFlyAudio) {
-        window.susanooFlyAudio.pause();
-        window.susanooFlyAudio.currentTime = 0;
+    if (window.susanooFlyAudio && window.fadeToVolume) {
+        window.fadeToVolume(window.susanooFlyAudio, 0, 150, true);
     }
 
     // --- RESET ĐIỂM SỐ & TIỀN VÀNG ---

@@ -34,11 +34,7 @@ setupInputs();
 
 // 7. FPS, PAUSE & VÒNG LẶP RENDER
 // ==========================================
-state.isPaused = false;
-document.getElementById('btnPause').addEventListener('click', (e) => {
-    state.isPaused = !state.isPaused;
-    e.target.innerText = state.isPaused ? "Tiếp Tục ▶️" : "Tạm Dừng ⏸️";
-});
+// Logic Pause đã được chuyển hoàn toàn sang inputs.js để quản lý tập trung cùng nhạc nền
 
 let frameCount = 0;
 let lastFpsTime = performance.now();

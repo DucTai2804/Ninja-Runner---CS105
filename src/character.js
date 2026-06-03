@@ -258,12 +258,17 @@ gltfLoader.load('models/Characters/sasuke/susanoo_animation_clean.glb', function
 
     susanooMixer = new THREE.AnimationMixer(susanooModel);
 
-    susanooMixer.addEventListener('finished', function (e) {
+    susanooMixer.addEventListener('finished', function(e) {
         if (state.isSusanooSlashing) {
             state.isSusanooSlashing = false;
             state.susanooSlashTimeRemaining = 0;
             let flyAnim = Object.keys(susanooAnimations).find(k => k.includes('fly')) || Object.keys(susanooAnimations)[0];
             if (flyAnim) playSusanooAnimation(flyAnim, true, 0.3);
+            
+            // Tiếp tục phát lại âm thanh bay đồng bộ với Animation (kéo volume lên lại mượt mà)
+            if (window.susanooFlyAudio && window.fadeToVolume) {
+                window.fadeToVolume(window.susanooFlyAudio, 0.8, 150);
+            }
         }
     });
 

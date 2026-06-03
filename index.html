@@ -27,6 +27,9 @@
 </head>
 
 <body>
+    <button id="btnMuteBGM"
+        style="position: absolute; top: 20px; right: 160px; padding: 10px 20px; background-color: #17a2b8; color: white; font-weight: bold; border-radius: 8px; border: none; cursor: pointer; z-index: 10;">Tắt
+        Nhạc 🔊</button>
     <button id="btnPause"
         style="position: absolute; top: 20px; right: 20px; padding: 10px 20px; background-color: #ffc107; font-weight: bold; border-radius: 8px; border: none; cursor: pointer; z-index: 10;">Tạm
         Dừng ⏸️</button>
@@ -49,25 +52,28 @@
         </div>
     </div>
     <!-- Thanh thời gian Susanoo -->
-    <div id="susanooBarContainer" style="display: none; position: absolute; top: 90px; left: 50%; transform: translateX(-50%); width: 300px; height: 15px; background: rgba(0,0,0,0.6); border: 2px solid #a832a8; border-radius: 10px; z-index: 10; pointer-events: none; overflow: hidden; box-shadow: 0 0 15px #a832a8, inset 0 0 5px black;">
-        <div id="susanooBarInner" style="width: 100%; height: 100%; background: linear-gradient(90deg, #6a1b9a, #d500f9, #ea80fc); border-radius: 8px; box-shadow: inset 0 0 10px rgba(255,255,255,0.5); transform-origin: left; transform: scaleX(1);"></div>
+    <div id="susanooBarContainer"
+        style="display: none; position: absolute; top: 90px; left: 50%; transform: translateX(-50%); width: 300px; height: 15px; background: rgba(0,0,0,0.6); border: 2px solid #a832a8; border-radius: 10px; z-index: 10; pointer-events: none; overflow: hidden; box-shadow: 0 0 15px #a832a8, inset 0 0 5px black;">
+        <div id="susanooBarInner"
+            style="width: 100%; height: 100%; background: linear-gradient(90deg, #6a1b9a, #d500f9, #ea80fc); border-radius: 8px; box-shadow: inset 0 0 10px rgba(255,255,255,0.5); transform-origin: left; transform: scaleX(1);">
+        </div>
     </div>
 
     <button id="btnToggleTrees"
         style="position: absolute; top: 100px; right: 20px; padding: 10px 20px; background-color: #28a745; color: white; font-weight: bold; border-radius: 8px; border: none; cursor: pointer; z-index: 10;">Ẩn
-        Núi ⛰️</button>
+        Núi </button>
 
     <div
         style="position: absolute; top: 150px; right: 20px; z-index: 10; background: rgba(0,0,0,0.6); padding: 10px; border-radius: 8px; color: white; font-family: sans-serif; display: flex; flex-direction: column; gap: 10px;">
-        
-        <label for="timeMode" style="font-weight: bold;">🌞 Thời gian:</label>
+
+        <label for="timeMode" style="font-weight: bold;">Thời gian:</label>
         <select id="timeMode" style="padding: 5px; border-radius: 5px; cursor: pointer;">
             <option value="auto">Tự động (Theo điểm)</option>
             <option value="day">Trời sáng</option>
             <option value="night">Trời tối</option>
         </select>
 
-        <label for="practiceMode" style="font-weight: bold;">🎯 Luyện tập:</label>
+        <label for="practiceMode" style="font-weight: bold;">Luyện tập:</label>
         <select id="practiceMode" style="padding: 5px; border-radius: 5px; cursor: pointer;">
             <option value="0">Ngẫu nhiên (Mặc định)</option>
             <option value="1">Mẫu 1: Đá rơi 1 làn</option>
@@ -87,6 +93,18 @@
         <p>Phím 1: Đại hỏa cầu</p>
         <p>Phím 2: Chidori (Xuyên phá)</p>
         <p>Phím 3: Susanoo (Bất tử 20s)</p>
+    </div>
+
+    <!-- Màn hình Bắt đầu (Start Menu) -->
+    <div id="startMenuUI"
+        style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); z-index: 200; display: flex; flex-direction: column; justify-content: center; align-items: center; font-family: sans-serif;">
+        <h1 style="color: white; font-size: 5rem; text-shadow: 2px 2px 10px #00e5ff, 0 0 20px #00e5ff; margin-bottom: 50px;">
+            NINJA RUNNER
+        </h1>
+        <button id="btnStartGame"
+            style="padding: 20px 50px; font-size: 2rem; font-weight: bold; background: linear-gradient(90deg, #ff8a00, #e52e71); color: white; border: none; border-radius: 50px; cursor: pointer; box-shadow: 0 0 20px rgba(229, 46, 113, 0.5); transition: transform 0.2s;">
+            ▶ CHƠI GAME
+        </button>
     </div>
 
     <!-- Màn hình hiển thị khi thua game -->
