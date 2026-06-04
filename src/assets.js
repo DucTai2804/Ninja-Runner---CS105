@@ -45,18 +45,32 @@ chidoriAudio.volume = 1.0;
 window.chidoriAudio = chidoriAudio;
 
 export const susanooFlyAudio = new Audio('audios/susanoo_fly.wav');
-susanooFlyAudio.volume = 0.8;
-susanooFlyAudio.loop = true;
-
+susanooFlyAudio.volume = 1.0; 
+susanooFlyAudio.dataset.origVol = 1.5; // GainNode khuếch đại âm lượng lên 150%
+susanooFlyAudio.addEventListener('timeupdate', function () {
+    let buffer = 0.15; // Âm thanh bay ngắn hơn nên tua trước 0.15s
+    if (this.currentTime > this.duration - buffer) {
+        this.currentTime = 0;
+        this.play();
+    }
+});
 window.susanooFlyAudio = susanooFlyAudio;
 
 export const bgmAudio = new Audio('audios/rune_factory_3_ancient_bone.mp4');
-bgmAudio.volume = 0.4; // Để mức 40% để không lấn át tiếng hiệu ứng
-bgmAudio.loop = true;
+bgmAudio.volume = 0.15; // Để mức 15% để không lấn át tiếng hiệu ứng
+// Fix lỗi khựng nhạc (Gapless Loop): Tua lại ngay trước khi file kịp dừng hẳn
+bgmAudio.addEventListener('timeupdate', function () {
+    let buffer = 0.2; // Tua lại trước 0.2s
+    if (this.currentTime > this.duration - buffer) {
+        this.currentTime = 0;
+        this.play();
+    }
+});
 window.bgmAudio = bgmAudio;
 
 export const susanooSlashAudio = new Audio('audios/susanoo_slash.wav');
 susanooSlashAudio.volume = 1.0;
+susanooSlashAudio.dataset.origVol = 2.0; // Khuếch đại x2
 window.susanooSlashAudio = susanooSlashAudio;
 
 // Cải tiến cấp độ Phần cứng (Hardware-level): Sử dụng Web Audio API

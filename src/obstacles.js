@@ -72,10 +72,11 @@ export const fallingTreeMat = [barkMat, woodCoreMat, woodCoreMat];
 export const coinGeo = new THREE.CylinderGeometry(0.4, 0.4, 0.1, 16);
 coinGeo.rotateX(Math.PI / 2); // Đứng thẳng lên
 export const coinMat = new THREE.MeshStandardMaterial({
-    color: 0xffd700,
-    metalness: 0.8,
-    roughness: 0.2,
-    emissive: 0x443300
+    color: 0xffea00, // Màu vàng chanh rực rỡ hơn
+    metalness: 1.0, // Phản chiếu ánh sáng max
+    roughness: 0.1, // Bề mặt nhẵn bóng
+    emissive: 0xffaa00, // Tỏa sáng nhẹ màu vàng cam
+    emissiveIntensity: 0.6 // Cường độ tỏa sáng vừa phải để không bị chói
 });
 
 // Khởi tạo Phi Tiêu (Kunai/Shuriken)

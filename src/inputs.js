@@ -137,6 +137,11 @@ export function setupInputs() {
             if (!state.isSusanooActive) {
                 state.isSusanooActive = true;
                 state.susanooTimer = 20.0;
+                
+                // Tự động chuyển nhân vật về làn giữa
+                state.currentLane = 1;
+                state.targetLaneX = LANE_POSITIONS[1];
+                
                 if (susanooBarContainer) susanooBarContainer.style.display = 'block';
                 if (susanooBarInner) susanooBarInner.style.transform = 'scaleX(1)';
                 state.currentSpeed = state.baseSpeed * 4; // Bức tốc (giống Chidori)
