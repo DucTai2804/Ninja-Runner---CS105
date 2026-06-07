@@ -16,7 +16,7 @@ export const obsMat = new THREE.MeshLambertMaterial({
 });
 
 // Khởi tạo Đá Khổng Lồ (Đá Tròn To - Sphere)
-export const giantRockGeo = new THREE.SphereGeometry(1, 64, 32);
+export const giantRockGeo = new THREE.SphereGeometry(1, 24, 16);
 giantRockGeo.scale(20, 20, CONFIG.GIANT_ROCK_RADIUS);
 giantRockGeo.rotateZ(Math.PI / 2);
 
@@ -42,7 +42,7 @@ export const giantRockMat = new THREE.MeshLambertMaterial({
     color: 0x999999
 });
 
-// Khởi tạo Vách Núi Vuông
+// Khởi tạo Vách Núi Vuông (Giữ nguyên 32x32x32 theo yêu cầu để giữ nguyên 100% ngoại hình)
 export const mountainWallGeo = new THREE.BoxGeometry(1, 1, 1, 32, 32, 32);
 const mwPosAttr = mountainWallGeo.attributes.position;
 for (let i = 0; i < mwPosAttr.count; i++) {
@@ -60,6 +60,8 @@ for (let i = 0; i < mwPosAttr.count; i++) {
     mwPosAttr.setXYZ(i, x, y, z);
 }
 mountainWallGeo.computeVertexNormals();
+mountainWallGeo.computeBoundingBox();
+mountainWallGeo.computeBoundingSphere();
 
 // Khởi tạo Cây gỗ
 export const fallingTreeGeo = new THREE.CylinderGeometry(0.9, 0.9, 30, 8); 
@@ -250,9 +252,12 @@ export function spawnObstaclePattern(rowObstacles, rowCoins = null, practicePatt
         // TÙY CHỈNH KÍCH THƯỚC VÀ HITBOX CHO VÁCH NÚI NHÔ RA
         obsWall.mountainWall.scale.set(100.0, 40.0, 100.0);
 
-        // Hitbox gọt 4m chiều X (thu vào 2m mỗi bên) để bù trừ phần gai đá đâm ra, đảm bảo tuyệt đối không lấn làn an toàn
-        let cutZ = 5.0;
-        obsWall.hitboxCut = { x: 4.0, y: 0.0, z: cutZ, offsetX: 0, offsetY: 0, offsetZ: 0 };
+        // Bù trừ độ nở của BoundingBox do nhiễu loạn đỉnh (Noise Displacement).
+        // Vách núi scale(100, 40, 100). Noise biên độ 0.02 (+/- 0.01).
+        // Trục Z nở ra tối đa: 0.01 * 100 = 1m (mỗi bên). Cần gọt cutZ = 2.0m.
+        // Trục Y nở ra tối đa: 0.01 * 40 = 0.4m (mỗi bên). Cần gọt cutY = 0.8m.
+        let cutZ = 2.0;
+        obsWall.hitboxCut = { x: 4.0, y: 0.8, z: cutZ, offsetX: 0, offsetY: 0, offsetZ: 0 };
 
         // ScaleX = 100, bán kính = 50. 
         // Đặt ở X = 49.5 thì mép đá sẽ nằm ở 49.5 - 50 = -0.5 (Chặn gọn gàng làn giữa, không lấn làn an toàn)
@@ -333,7 +338,7 @@ for (let i = 0; i < 8; i++) {
         let obsSlot = {
             rock: new THREE.Mesh(obsGeo, obsMat),
             giantRock: new THREE.Mesh(giantRockGeo, giantRockMat), // Bổ sung tảng đá khổng lồ Lục Giác
-            mountainWall: new THREE.Mesh(mountainWallGeo, giantRockMat), // Bổ sung vách núi hình chữ nhật
+            mountainWall: new THREE.Mesh(mountainWallGeo, giantRockMat), // Sử dụng material gốc
             tree: new THREE.Mesh(fallingTreeGeo, fallingTreeMat),
             shadow: new THREE.Mesh(shadowGeo, shadowMat.clone()), // CLONE để mỗi bóng có thể tự thay đổi độ mờ độc lập!
             shuriken: null, // Sẽ load sau trong assets.js
@@ -355,8 +360,12 @@ for (let i = 0; i < 8; i++) {
         obsSlot.rock.receiveShadow = true;
         obsSlot.giantRock.castShadow = true;
         obsSlot.giantRock.receiveShadow = true;
+        
+        // Vách núi khổng lồ: BẬT LẠI đổ bóng (castShadow = true) theo yêu cầu test của user.
+        // TẮT receiveShadow: Vì vách núi quá khổng lồ, khi camera tiến lại gần, việc tính toán 
+        // bóng râm hắt LÊN nó (receive) cho hàng triệu pixel sẽ làm chết ngộp GPU (Fill-rate bottleneck).
         obsSlot.mountainWall.castShadow = true;
-        obsSlot.mountainWall.receiveShadow = true;
+        obsSlot.mountainWall.receiveShadow = false;
         obsSlot.tree.castShadow = true;
         obsSlot.tree.receiveShadow = true;
 
@@ -404,6 +413,14 @@ for (let i = 0; i < 8; i++) {
 // --- TẢI MÔ HÌNH PHI TIÊU (SHURIKEN) ---
 gltfLoader.load('models/Dangers/true_shuriken_scale.glb', function (gltf) {
     let shurikenModel = gltf.scene;
+
+    // Tính toán Bounding Box gốc (Local Box) MỘT LẦN DUY NHẤT cho toàn bộ Group
+    shurikenModel.position.set(0, 0, 0);
+    shurikenModel.rotation.set(0, 0, 0);
+    shurikenModel.scale.set(1, 1, 1);
+    shurikenModel.updateMatrixWorld(true);
+    let localBox = new THREE.Box3().setFromObject(shurikenModel);
+    shurikenModel.userData.baseBox = localBox;
 
     // Áp dụng tỷ lệ đồng dạng tuyệt đối với Sasuke (5, 5, 5)
     shurikenModel.scale.set(5, 5, 5);

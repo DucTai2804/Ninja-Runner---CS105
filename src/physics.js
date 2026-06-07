@@ -176,12 +176,27 @@ export function updatePhysics(delta, moveDistance) {
                     let oldRot = mesh.rotation.clone();
                     if (obs.activeType === 'rock' || obs.activeType === 'tree' || obs.activeType === 'giantRock') {
                         mesh.rotation.set(0, 0, 0);
+                        mesh.updateMatrixWorld(true); // Chỉ cập nhật khi bị ép xoay về 0
                     }
 
-                    obsBox.setFromObject(mesh);
+                    if (mesh.geometry) {
+                        if (!mesh.geometry.boundingBox) {
+                            mesh.geometry.computeBoundingBox();
+                        }
+                        
+                        // Tối ưu cực mạnh (O(1)) cho các Mesh nặng
+                        obsBox.copy(mesh.geometry.boundingBox).applyMatrix4(mesh.matrixWorld);
+                    } else if (mesh.userData && mesh.userData.baseBox) {
+                        // Tối ưu O(1) cho THREE.Group nặng (như Shuriken 5.1MB)
+                        obsBox.copy(mesh.userData.baseBox).applyMatrix4(mesh.matrixWorld);
+                    } else {
+                        // Fallback cho THREE.Group không được cache
+                        obsBox.setFromObject(mesh);
+                    }
 
                     if (obs.activeType === 'rock' || obs.activeType === 'tree' || obs.activeType === 'giantRock') {
                         mesh.rotation.copy(oldRot);
+                        mesh.updateMatrixWorld(true); // Cập nhật lại ma trận để render đúng
                     }
 
                     if (obs.activeType === 'shuriken') {
