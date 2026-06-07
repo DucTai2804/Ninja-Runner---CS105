@@ -1,7 +1,7 @@
 import { scene, camera, controls } from './core.js';
 import { fireTex } from './assets.js';
 import { state } from './state.js';
-import { sasuke, sasukeAnimations, sasukeAnimList, susanooModel, sasukeModel, susanooMixer, middleFingerBone, rightHandBone, susanooSwordHitbox } from './character.js';
+import { sasuke, sasukeAnimations, sasukeAnimList, susanooModel, sasukeModel, susanooMixer, middleFingerBone, rightHandBone, susanooSwordHitbox, stopSusanooAnimation } from './character.js';
 import { treeInstancedMeshes } from './environment.js';
 import { GLSL_NOISE } from './utils.js';
 import { MAX_PARTICLES } from './config.js';
@@ -634,7 +634,7 @@ export function updateSkills(delta) {
             state.currentSpeed = state.baseSpeed; // Trả lại tốc độ bình thường
             if (susanooModel) susanooModel.visible = false;
             if (sasukeModel) sasukeModel.visible = true; // Hiện lại Sasuke
-            if (susanooMixer) susanooMixer.stopAllAction();
+            stopSusanooAnimation();
             import('./main.js').then(m => m.createFlameBlast()); // Bùng nổ lửa tím trắng xóa khi hết Susanoo
             state.cameraTransitionTime = 1.0; // Bắt đầu chuyển đổi góc camera về Sasuke
 

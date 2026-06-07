@@ -180,9 +180,10 @@ export function playSusanooAnimation(name, force = false, fadeTime = 0.2) {
     const action = susanooAnimations[name];
     if (currentSusanooAction === action && !force) return;
 
-    if (currentSusanooAction) {
-        currentSusanooAction.fadeOut(fadeTime);
-    }
+    let prevAction = currentSusanooAction;
+
+    // Chỉ crossfade nếu prevAction tồn tại, khác action mới và đang có trọng số (để tránh lỗi T-pose khi vừa stopAllAction)
+    let canCrossFade = prevAction && prevAction !== action && prevAction.getEffectiveWeight() > 0;
 
     action.reset();
     action.setEffectiveTimeScale(1);
@@ -193,11 +194,34 @@ export function playSusanooAnimation(name, force = false, fadeTime = 0.2) {
         action.clampWhenFinished = true;
     } else {
         action.setLoop(THREE.LoopRepeat, Infinity);
+        action.clampWhenFinished = false;
     }
 
-    action.fadeIn(fadeTime);
     action.play();
+
+    if (canCrossFade) {
+        if (fadeTime > 0) {
+            action.crossFadeFrom(prevAction, fadeTime, false);
+            // Dừng hẳn action cũ sau khi fade xong để xóa triệt để trọng số (weight)
+            setTimeout(() => {
+                // Chỉ stop nếu action cũ thực sự cần stop, để tránh stop nhầm nếu user spam nhanh
+                if (currentSusanooAction !== prevAction) {
+                    prevAction.stop();
+                }
+            }, fadeTime * 1000);
+        } else {
+            prevAction.stop();
+        }
+    } else if (prevAction && prevAction !== action) {
+        prevAction.stop();
+    }
+
     currentSusanooAction = action;
+}
+
+export function stopSusanooAnimation() {
+    if (susanooMixer) susanooMixer.stopAllAction();
+    currentSusanooAction = null;
 }
 
 gltfLoader.load('models/Characters/sasuke/susanoo_animation_clean.glb', function (gltf) {

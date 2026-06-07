@@ -44,17 +44,6 @@ export const chidoriAudio = new Audio('audios/chidori.mp4');
 chidoriAudio.volume = 1.0;
 window.chidoriAudio = chidoriAudio;
 
-export const susanooFlyAudio = new Audio('audios/susanoo_fly.wav');
-susanooFlyAudio.volume = 1.0; 
-susanooFlyAudio.dataset.origVol = 1.5; // GainNode khuếch đại âm lượng lên 150%
-susanooFlyAudio.addEventListener('timeupdate', function () {
-    let buffer = 0.15; // Âm thanh bay ngắn hơn nên tua trước 0.15s
-    if (this.currentTime > this.duration - buffer) {
-        this.currentTime = 0;
-        this.play();
-    }
-});
-window.susanooFlyAudio = susanooFlyAudio;
 
 export const bgmAudio = new Audio('audios/rune_factory_3_ancient_bone.mp4');
 bgmAudio.volume = 0.15; // Để mức 15% để không lấn át tiếng hiệu ứng
@@ -78,6 +67,90 @@ window.susanooSlashAudio = susanooSlashAudio;
 const AudioContext = window.AudioContext || window.webkitAudioContext;
 window.audioCtx = new AudioContext();
 
+// Tải Audio Buffer cho tiếng chém và tiếng bay
+export let susanooSlashBuffer = null;
+export let susanooFlyBuffer = null;
+
+fetch('audios/susanoo_fly.wav')
+    .then(response => response.arrayBuffer())
+    .then(arrayBuffer => window.audioCtx.decodeAudioData(arrayBuffer))
+    .then(audioBuffer => {
+        susanooFlyBuffer = audioBuffer;
+    })
+    .catch(e => console.log("Lỗi tải audio fly:", e));
+
+export const susanooFlyAudio = {
+    isCustomWebAudio: true,
+    source: null,
+    gainNode: null,
+    isPlaying: false,
+    play: function() {
+        if (!susanooFlyBuffer || this.isPlaying) return;
+        if (window.audioCtx.state === 'suspended') window.audioCtx.resume();
+        
+        this.source = window.audioCtx.createBufferSource();
+        this.source.buffer = susanooFlyBuffer;
+        this.source.loop = true; // Vòng lặp gapless hoàn hảo ở cấp độ phần cứng
+        
+        this.gainNode = window.audioCtx.createGain();
+        this.gainNode.gain.value = 0; 
+        
+        this.source.connect(this.gainNode);
+        this.gainNode.connect(window.audioCtx.destination);
+        
+        this.source.start(0);
+        this.isPlaying = true;
+    },
+    stop: function() {
+        if (this.source && this.isPlaying) {
+            this.source.stop();
+            this.source.disconnect();
+            this.source = null;
+            this.isPlaying = false;
+        }
+    },
+    fadeTo: function(targetVol, durationMs, pauseAfter = false) {
+        if (!this.gainNode) return;
+        let now = window.audioCtx.currentTime;
+        let durationSec = durationMs / 1000;
+        this.gainNode.gain.cancelScheduledValues(now);
+        this.gainNode.gain.setValueAtTime(this.gainNode.gain.value, now);
+        this.gainNode.gain.linearRampToValueAtTime(targetVol, now + durationSec);
+        
+        if (pauseAfter && targetVol === 0) {
+            setTimeout(() => {
+                this.stop();
+            }, durationMs + 50);
+        }
+    }
+};
+window.susanooFlyAudio = susanooFlyAudio;
+
+fetch('audios/susanoo_slash.wav')
+    .then(response => response.arrayBuffer())
+    .then(arrayBuffer => window.audioCtx.decodeAudioData(arrayBuffer))
+    .then(audioBuffer => {
+        susanooSlashBuffer = audioBuffer;
+    })
+    .catch(e => console.log("Lỗi tải audio buffer:", e));
+
+window.playSusanooSlashSfx = function() {
+    if (!susanooSlashBuffer) return false;
+    if (window.audioCtx.state === 'suspended') window.audioCtx.resume();
+    
+    let source = window.audioCtx.createBufferSource();
+    source.buffer = susanooSlashBuffer;
+    
+    let gainNode = window.audioCtx.createGain();
+    gainNode.gain.value = 2.0; // Khuếch đại x2
+    
+    source.connect(gainNode);
+    gainNode.connect(window.audioCtx.destination);
+    
+    source.start(0);
+    return true;
+};
+
 window.initWebAudio = function (audio) {
     if (audio.gainNode) return;
     audio.gainNode = window.audioCtx.createGain();
@@ -92,6 +165,13 @@ window.initWebAudio = function (audio) {
 
 window.fadeToVolume = function (audio, targetVol, durationMs = 150, pauseAfter = false) {
     if (!audio) return;
+    
+    // Nếu là đối tượng âm thanh WebAudio tự tạo
+    if (audio.isCustomWebAudio) {
+        audio.fadeTo(targetVol, durationMs, pauseAfter);
+        return;
+    }
+
     if (window.audioCtx.state === 'suspended') window.audioCtx.resume();
 
     // Khởi tạo Web Audio Node cho thẻ audio này nếu chưa có

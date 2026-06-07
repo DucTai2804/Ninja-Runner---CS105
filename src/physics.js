@@ -224,8 +224,8 @@ export function updatePhysics(delta, moveDistance) {
                     }
 
                     // --- KIỂM TRA KIẾM CHÉM TRÚNG CHƯỚNG NGẠI ---
-                    // Thanh kiếm được chém xuống chạm đất (hoặc vật cản) ở giây thứ 0.26
-                    if (isSwordSlashing && state.slashElapsedTime >= 0.26) {
+                    // Thanh kiếm được chém xuống chạm đất (hoặc vật cản) từ giây thứ 0.23 đến 0.5
+                    if (isSwordSlashing && state.slashElapsedTime >= 0.23 && state.slashElapsedTime <= 0.5) {
                         if (swordBox.intersectsBox(obsBox)) {
                             mesh.visible = false;
                             obs.activeType = 'none';

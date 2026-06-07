@@ -1,7 +1,7 @@
 
 import { state } from './state.js';
 import { LANE_POSITIONS } from './config.js';
-import { playAnimation, sasukeAnimations, sasukeAnimList, susanooAnimations, susanooModel, sasukeHitbox } from './character.js';
+import { playAnimation, sasukeAnimations, sasukeAnimList, susanooAnimations, susanooModel, sasukeHitbox, playSusanooAnimation } from './character.js';
 import { chidoriGroup } from './skills.js';
 import { treeInstancedMeshes } from './environment.js';
 import { showHitbox, toggleHitboxes } from './physics.js';
@@ -150,8 +150,13 @@ export function setupInputs() {
 
                 // Phát âm thanh bay
                 if (window.susanooFlyAudio) {
-                    window.susanooFlyAudio.currentTime = 0;
-                    window.susanooFlyAudio.play().catch(e => console.log("Lỗi phát audio susanoo:", e));
+                    if (window.susanooFlyAudio.isCustomWebAudio) {
+                        window.susanooFlyAudio.play();
+                        window.fadeToVolume(window.susanooFlyAudio, 0.8, 100);
+                    } else {
+                        window.susanooFlyAudio.currentTime = 0;
+                        window.susanooFlyAudio.play().catch(e => console.log("Lỗi phát audio susanoo:", e));
+                    }
                 }
 
                 // Hiện các ngọn núi khổng lồ
@@ -164,40 +169,32 @@ export function setupInputs() {
                 if (susanooModel) {
                     susanooModel.visible = true;
                     let flyAnim = Object.keys(susanooAnimations).find(k => k.includes('fly'));
-                    if (flyAnim && susanooAnimations[flyAnim]) {
-                        let action = susanooAnimations[flyAnim];
-                        action.reset().fadeIn(0.2).play();
-                        action.setLoop(THREE.LoopRepeat, Infinity);
-                        action.clampWhenFinished = false;
+                    if (flyAnim) {
+                        playSusanooAnimation(flyAnim, true, 0.2);
                     }
                 }
             } else if (!state.isSusanooSlashing) {
                 // Chờ hoạt ảnh chém xong mới cho phép chém tiếp
                 state.isSusanooSlashing = true;
                 let slashAnim = Object.keys(susanooAnimations).find(k => k.includes('slash'));
-                if (slashAnim && susanooAnimations[slashAnim]) {
+                if (slashAnim) {
+                    playSusanooAnimation(slashAnim, true, 0.1);
                     let action = susanooAnimations[slashAnim];
-                    action.reset().fadeIn(0.1).play();
-                    action.setLoop(THREE.LoopOnce, 1);
-                    action.clampWhenFinished = true;
 
                     // Ghi nhận thời lượng hoạt ảnh chém để bật tắt Dư Ảnh Kiếm
                     state.susanooSlashTimeRemaining = action.getClip().duration || 1.5;
                     console.log("Bắt đầu chém! Thời gian:", state.susanooSlashTimeRemaining);
-
-                    // Cắt mượt mà fly để nhường chỗ cho slash
-                    let flyAnim = Object.keys(susanooAnimations).find(k => k.includes('fly'));
-                    if (flyAnim && susanooAnimations[flyAnim]) {
-                        susanooAnimations[flyAnim].fadeOut(0.1);
-                    }
                     
                     // Nhúng (Duck) âm thanh bay xuống mức 10% (0.1) cực nhanh (100ms) để nhường chỗ cho tiếng chém
                     if (window.susanooFlyAudio && window.fadeToVolume) {
                         window.fadeToVolume(window.susanooFlyAudio, 0.1, 100);
                     }
 
-                    // Phát âm thanh chém kiếm (Dùng cloneNode để có thể phát đè nhiều âm thanh mượt mà không bị cắt tiếng ngang)
-                    if (window.susanooSlashAudio) {
+                    // Phát âm thanh chém kiếm (Sử dụng Web Audio API Buffer để phát đè không bị rụt/cắt tiếng)
+                    if (window.playSusanooSlashSfx && window.playSusanooSlashSfx()) {
+                        // Đã phát qua Buffer
+                    } else if (window.susanooSlashAudio) {
+                        // Fallback nếu buffer chưa tải xong
                         let slashSfx = window.susanooSlashAudio.cloneNode();
                         slashSfx.volume = window.susanooSlashAudio.volume;
                         slashSfx.play().catch(e => console.log(e));
