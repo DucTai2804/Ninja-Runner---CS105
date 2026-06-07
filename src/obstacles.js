@@ -42,6 +42,14 @@ export const giantRockMat = new THREE.MeshLambertMaterial({
     color: 0x999999
 });
 
+// KHỞI TẠO PROXY SHADOW (BÓNG THẾ THÂN TÀNG HÌNH)
+// Dùng để đổ bóng thay cho các vật thể nhiều đa giác, giúp tối ưu FPS tuyệt đối
+export const proxyMat = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false });
+export const mountainWallProxyGeo = new THREE.BoxGeometry(1, 1, 1); // 12 đa giác
+export const giantRockProxyGeo = new THREE.SphereGeometry(1, 8, 4); // 64 đa giác
+giantRockProxyGeo.scale(20, 20, CONFIG.GIANT_ROCK_RADIUS);
+giantRockProxyGeo.rotateZ(Math.PI / 2);
+
 // Khởi tạo Vách Núi Vuông (Giữ nguyên 32x32x32 theo yêu cầu để giữ nguyên 100% ngoại hình)
 export const mountainWallGeo = new THREE.BoxGeometry(1, 1, 1, 32, 32, 32);
 const mwPosAttr = mountainWallGeo.attributes.position;
@@ -113,6 +121,8 @@ export function spawnObstaclePattern(rowObstacles, rowCoins = null, practicePatt
         obs.mountainWall.scale.set(1, 1, 1); 
         obs.mountainWall.position.set(0, 0, 0);
         obs.mountainWall.visible = false;
+        if (obs.mountainWallProxy) obs.mountainWallProxy.visible = false;
+        if (obs.giantRockProxy) obs.giantRockProxy.visible = false;
 
         obs.isFalling = false;
         obs.rotSpeedX = 0; // Reset quán tính
@@ -225,6 +235,9 @@ export function spawnObstaclePattern(rowObstacles, rowCoins = null, practicePatt
         let bottomY = CONFIG.GIANT_ROCK_SLIDE_Y - CONFIG.GIANT_ROCK_RADIUS;
         obs.giantRock.position.set(0, bottomY + 20, 0); // 20 là bán kính trục Y của khối cầu
         obs.giantRock.visible = true;
+
+        obs.giantRockProxy.position.copy(obs.giantRock.position);
+        obs.giantRockProxy.visible = true;
     } else if (rand < 0.92) {
         // Mẫu 8 (7%): Đá khổng lồ chìm dưới đất -> Ép NHẢY
         let obs = rowObstacles[1];
@@ -239,6 +252,9 @@ export function spawnObstaclePattern(rowObstacles, rowCoins = null, practicePatt
         let topY = CONFIG.GIANT_ROCK_JUMP_Y + CONFIG.GIANT_ROCK_RADIUS;
         obs.giantRock.position.set(0, topY - 20, 0); // 20 là bán kính trục Y của khối cầu
         obs.giantRock.visible = true;
+
+        obs.giantRockProxy.position.copy(obs.giantRock.position);
+        obs.giantRockProxy.visible = true;
     } else {
         // Mẫu 9 (8%): Vách núi khổng lồ nhô ra chặn 2 làn + Phi tiêu bay ở làn an toàn
         let isLeft = Math.random() > 0.5;
@@ -264,6 +280,10 @@ export function spawnObstaclePattern(rowObstacles, rowCoins = null, practicePatt
         let wallX = isLeft ? -49.5 : 49.5;
         obsWall.mountainWall.position.set(wallX, 20, 0); // Y = 20 vì tâm nằm ở giữa khối Box cao 40m
         obsWall.mountainWall.visible = true;
+
+        obsWall.mountainWallProxy.position.copy(obsWall.mountainWall.position);
+        obsWall.mountainWallProxy.scale.copy(obsWall.mountainWall.scale);
+        obsWall.mountainWallProxy.visible = true;
 
         // Phi tiêu: Ép người chơi trượt để né khi đang đi vào làn an toàn duy nhất
         let obsShuriken = rowObstacles[shurikenLane];
@@ -342,6 +362,11 @@ for (let i = 0; i < 8; i++) {
             tree: new THREE.Mesh(fallingTreeGeo, fallingTreeMat),
             shadow: new THREE.Mesh(shadowGeo, shadowMat.clone()), // CLONE để mỗi bóng có thể tự thay đổi độ mờ độc lập!
             shuriken: null, // Sẽ load sau trong assets.js
+            
+            // PROXY SHADOWS (BÓNG THẾ THÂN TÀNG HÌNH)
+            mountainWallProxy: new THREE.Mesh(mountainWallProxyGeo, proxyMat),
+            giantRockProxy: new THREE.Mesh(giantRockProxyGeo, proxyMat),
+
             activeType: 'none',
             // Thuộc tính vật lý cho rơi tự do
             isFalling: false,
@@ -358,14 +383,17 @@ for (let i = 0; i < 8; i++) {
 
         obsSlot.rock.castShadow = true;
         obsSlot.rock.receiveShadow = true;
-        obsSlot.giantRock.castShadow = true;
-        obsSlot.giantRock.receiveShadow = true;
         
-        // Vách núi khổng lồ: BẬT LẠI đổ bóng (castShadow = true) theo yêu cầu test của user.
-        // TẮT receiveShadow: Vì vách núi quá khổng lồ, khi camera tiến lại gần, việc tính toán 
-        // bóng râm hắt LÊN nó (receive) cho hàng triệu pixel sẽ làm chết ngộp GPU (Fill-rate bottleneck).
-        obsSlot.mountainWall.castShadow = true;
+        // Tắt bóng thật, bật bóng thế thân cho Đá Khổng Lồ (Tiết kiệm từ 768 xuống 64 đa giác)
+        obsSlot.giantRock.castShadow = false;
+        obsSlot.giantRock.receiveShadow = false;
+        obsSlot.giantRockProxy.castShadow = true;
+
+        // Tắt bóng thật, bật bóng thế thân cho Vách Núi (Tiết kiệm từ 12,288 xuống 12 đa giác)
+        obsSlot.mountainWall.castShadow = false;
         obsSlot.mountainWall.receiveShadow = false;
+        obsSlot.mountainWallProxy.castShadow = true;
+
         obsSlot.tree.castShadow = true;
         obsSlot.tree.receiveShadow = true;
 
@@ -385,7 +413,9 @@ for (let i = 0; i < 8; i++) {
 
         rowGroup.add(obsSlot.rock);
         rowGroup.add(obsSlot.giantRock);
+        rowGroup.add(obsSlot.giantRockProxy);
         rowGroup.add(obsSlot.mountainWall);
+        rowGroup.add(obsSlot.mountainWallProxy);
         rowGroup.add(obsSlot.tree);
         rowGroup.add(obsSlot.shadow);
         rowObstacles.push(obsSlot);

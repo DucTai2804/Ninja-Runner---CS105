@@ -601,8 +601,16 @@ export function updateSkills(delta) {
 
     // Giảm lớp sương đằng xa để nhìn được xa hơn khi bay cao
     let targetFogFar = state.isSusanooActive ? 300 : 100;
-    if (scene.fog && scene.fog.far !== targetFogFar) {
+    let targetCamFar = state.isSusanooActive ? 320 : 120; // Luôn giữ camera.far lớn hơn sương mù một chút
+    
+    if (scene.fog && Math.abs(scene.fog.far - targetFogFar) > 0.1) {
         scene.fog.far += (targetFogFar - scene.fog.far) * (delta * 4);
+    }
+    
+    // Mở rộng tầm nhìn vật lý của Camera để không bị cắt hụt khi sương mù lùi ra xa
+    if (Math.abs(camera.far - targetCamFar) > 0.1) {
+        camera.far += (targetCamFar - camera.far) * (delta * 4);
+        camera.updateProjectionMatrix();
     }
 
     if (state.isSusanooActive) {

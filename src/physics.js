@@ -245,6 +245,9 @@ export function updatePhysics(delta, moveDistance) {
                             mesh.visible = false;
                             obs.activeType = 'none';
                             if (obs.helper) obs.helper.visible = false;
+                            if (obs.shadow) obs.shadow.visible = false;
+                            if (obs.giantRockProxy) obs.giantRockProxy.visible = false;
+                            if (obs.mountainWallProxy) obs.mountainWallProxy.visible = false;
                             continue; // Đã chém nát thì không cần xét va chạm thân thể Sasuke nữa
                         }
                     }
@@ -262,6 +265,9 @@ export function updatePhysics(delta, moveDistance) {
                                 mesh.visible = false;
                                 obs.activeType = 'none';
                                 if (obs.helper) obs.helper.visible = false;
+                                if (obs.shadow) obs.shadow.visible = false;
+                                if (obs.giantRockProxy) obs.giantRockProxy.visible = false;
+                                if (obs.mountainWallProxy) obs.mountainWallProxy.visible = false;
                             }
                         }
                     } else if (sasukeOBB.intersectsBox3(obsBox)) {
@@ -382,6 +388,9 @@ export function updatePhysics(delta, moveDistance) {
                         if (fireballBox.intersectsBox(obsBox)) {
                             mesh.visible = false; // Bắn vỡ đá/phi tiêu
                             obs.activeType = 'none';
+                            if (obs.shadow) obs.shadow.visible = false;
+                            if (obs.giantRockProxy) obs.giantRockProxy.visible = false;
+                            if (obs.mountainWallProxy) obs.mountainWallProxy.visible = false;
                             hit = true;
                             break;
                         }

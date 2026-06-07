@@ -6,7 +6,7 @@ export const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x88aacc); // Màu sương mù khu rừng
 scene.fog = new THREE.Fog(0x88aacc, 20, 100); // Đẩy sương mù lùi ra xa
 
-export const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+export const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 120);
 camera.position.set(0, 6, 9);
 camera.lookAt(0, 0, -10);
 

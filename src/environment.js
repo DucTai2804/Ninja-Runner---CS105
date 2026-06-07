@@ -15,20 +15,29 @@ hemiLight.position.set(0, 20, 0);
 scene.add(hemiLight);
 
 export const dirLight = new THREE.DirectionalLight(DAY_COLORS.dir, DAY_COLORS.dirIntensity);
-dirLight.position.set(-20, 25, 10);
-dirLight.castShadow = true;
-dirLight.shadow.mapSize.width = 1024;
-dirLight.shadow.mapSize.height = 1024;
-dirLight.shadow.camera.near = 0.5;
-dirLight.shadow.camera.far = 100;
+// Đặt nguồn sáng lùi xa về phía sau người chơi để khi kéo dài vùng đổ bóng không bị lỗi cắt hình
+// Tỷ lệ vẫn được giữ nguyên gốc: (-20, 25, 10) nhân lên 3 lần
+dirLight.position.set(-60, 75, 30);
+dirLight.target.position.set(0, 0, -20); // Tâm ở Z = -20 (Trước mặt Sasuke một đoạn)
 
-const d = 30;
-dirLight.shadow.camera.left = -d;
-dirLight.shadow.camera.right = d;
-dirLight.shadow.camera.top = d;
-dirLight.shadow.camera.bottom = -d;
+dirLight.castShadow = true;
+dirLight.shadow.mapSize.width = 512; // GIẢM ĐỘ PHÂN GIẢI BÓNG ĐỂ TĂNG 4 LẦN TỐC ĐỘ RENDER
+dirLight.shadow.mapSize.height = 512;
+// Do lùi nguồn sáng, phải tăng khoảng nhìn (far) để bao trọn con đường
+dirLight.shadow.camera.near = 0.5;
+dirLight.shadow.camera.far = 150; // Giảm xuống 150 để vừa đủ
+
+// THỰC HIỆN Ý TƯỞNG CỦA USER MỘT CÁCH TỐI ƯU HƠN: 
+// Đổ bóng bất đối xứng: Lùi ra sau đủ bao phủ Sasuke (Z=12), nhưng vươn xa về trước (Z=-70)
+dirLight.shadow.camera.left = -50;  // Vươn xa về phía sương mù (tới Z = -70)
+dirLight.shadow.camera.right = 35;  // Đủ lùi về phía sau người chơi (tới Z = 15, bao trọn Sasuke)
+dirLight.shadow.camera.top = 30;    
+dirLight.shadow.camera.bottom = -30;
+
 dirLight.shadow.bias = -0.0005;
 scene.add(dirLight);
+scene.add(dirLight.target); // BẮT BUỘC add target khi đã dời khỏi (0,0,0)
+dirLight.shadow.camera.updateProjectionMatrix();
 
 export function applyTimeMode(mode) {
     let colors = mode === 'night' ? NIGHT_COLORS : DAY_COLORS;
