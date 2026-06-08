@@ -2,7 +2,6 @@ import { scene, camera, controls, renderer } from './core.js';
 import { fireTex } from './assets.js';
 import { state } from './state.js';
 import { sasuke, susanooModel, middleFingerBone, rightHandBone, susanooMixer, susanooSwordHitbox, sasukeModel, stopSusanooAnimation, susanooLight } from './character.js';
-import { obstacleRows } from './obstacles.js';
 import { treeInstancedMeshes } from './environment.js';
 import { GLSL_NOISE } from './utils.js';
 import { MAX_PARTICLES } from './config.js';
@@ -1355,22 +1354,6 @@ export function precompileShaders() {
     prepareForCompile(chidoriGroup);
     if (susanooModel) prepareForCompile(susanooModel);
 
-    // Precompile chướng ngại vật (bao gồm Shuriken)
-    if (obstacleRows && obstacleRows.length > 0) {
-        let firstRow = obstacleRows[0];
-        if (firstRow.obstacles && firstRow.obstacles.length > 0) {
-            let obs = firstRow.obstacles[0];
-            if (obs.rock) prepareForCompile(obs.rock);
-            if (obs.giantRock) prepareForCompile(obs.giantRock);
-            if (obs.tree) prepareForCompile(obs.tree);
-            if (obs.shuriken) prepareForCompile(obs.shuriken);
-            if (obs.mountainWall) prepareForCompile(obs.mountainWall);
-        }
-        if (firstRow.coins && firstRow.coins.length > 0) {
-            prepareForCompile(firstRow.coins[0].mesh);
-        }
-    }
-
     // Bắt đầu pre-compile cho các trường hợp số lượng đèn khác nhau (0, 1, 2, 3 đèn)
     // Để khi vào game bật/tắt đèn sẽ lấy từ Cache ra thay vì recompile
     if (susanooLight) susanooLight.visible = false;
@@ -1400,21 +1383,6 @@ export function precompileShaders() {
     if (fireballPool.length > 0) fireballPool[0].group.visible = false;
     if (blastPool.length > 0) blastPool[0].group.visible = false;
     if (particlePool.length > 0) particlePool[0].visible = false;
-
-    if (obstacleRows && obstacleRows.length > 0) {
-        let firstRow = obstacleRows[0];
-        if (firstRow.obstacles && firstRow.obstacles.length > 0) {
-            let obs = firstRow.obstacles[0];
-            if (obs.rock) obs.rock.visible = false;
-            if (obs.giantRock) obs.giantRock.visible = false;
-            if (obs.tree) obs.tree.visible = false;
-            if (obs.shuriken) obs.shuriken.visible = false;
-            if (obs.mountainWall) obs.mountainWall.visible = false;
-        }
-        if (firstRow.coins && firstRow.coins.length > 0) {
-            firstRow.coins[0].mesh.visible = false;
-        }
-    }
 
     fireLight.visible = false;
     chidoriLight.visible = false;

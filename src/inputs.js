@@ -269,6 +269,8 @@ state.isPaused = true;
 
 // Xử lý nút Bắt Đầu Game (Start Menu)
 import { precompileShaders } from './skills.js';
+import { precompileObstacles } from './obstacles.js';
+import { renderer, scene, camera } from './core.js';
 
 const startMenuUI = document.getElementById('startMenuUI');
 const btnStartGame = document.getElementById('btnStartGame');
@@ -276,6 +278,7 @@ if (btnStartGame && startMenuUI) {
     btnStartGame.addEventListener('click', () => {
         // 0. Precompile shaders trước khi vào game để tránh giật lag lần đầu tung chiêu
         precompileShaders();
+        precompileObstacles(renderer, camera);
 
         // 1. Ẩn màn hình Menu
         startMenuUI.style.display = 'none';

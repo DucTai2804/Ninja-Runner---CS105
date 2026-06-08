@@ -474,3 +474,57 @@ gltfLoader.load('models/Dangers/true_shuriken_scale.glb', function (gltf) {
     });
     console.log("Đã trang bị xong hệ thống Phi tiêu Tử thần!");
 });
+
+// ==========================================
+// PRECOMPILE SHADERS CHO CHƯỚNG NGẠI VẬT
+// ==========================================
+export function precompileObstacles(renderer, camera) {
+    if (!obstacleRows || obstacleRows.length === 0) return;
+
+    let firstRow = obstacleRows[0];
+    let forceCompileMeshes = [];
+
+    function prepare(mesh) {
+        if (!mesh) return;
+        mesh.visible = true;
+        mesh.traverse(child => {
+            if (child.isMesh) {
+                child.userData.wasCulled = child.frustumCulled;
+                child.frustumCulled = false;
+                forceCompileMeshes.push(child);
+            }
+        });
+    }
+
+    if (firstRow.obstacles && firstRow.obstacles.length > 0) {
+        let obs = firstRow.obstacles[0];
+        prepare(obs.rock);
+        prepare(obs.giantRock);
+        prepare(obs.tree);
+        prepare(obs.shuriken);
+        prepare(obs.mountainWall);
+    }
+    
+    if (firstRow.coins && firstRow.coins.length > 0) {
+        prepare(firstRow.coins[0].mesh);
+    }
+
+    renderer.compile(scene, camera);
+
+    // Khôi phục
+    forceCompileMeshes.forEach(child => {
+        child.frustumCulled = child.userData.wasCulled;
+    });
+
+    if (firstRow.obstacles && firstRow.obstacles.length > 0) {
+        let obs = firstRow.obstacles[0];
+        if (obs.rock) obs.rock.visible = false;
+        if (obs.giantRock) obs.giantRock.visible = false;
+        if (obs.tree) obs.tree.visible = false;
+        if (obs.shuriken) obs.shuriken.visible = false;
+        if (obs.mountainWall) obs.mountainWall.visible = false;
+    }
+    if (firstRow.coins && firstRow.coins.length > 0) {
+        firstRow.coins[0].mesh.visible = false;
+    }
+}
