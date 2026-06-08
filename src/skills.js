@@ -340,8 +340,8 @@ export const chidoriParticleMat = new THREE.ShaderMaterial({
             float startZ = -0.3;
             
             float angle = hash(localSeed + 3.0) * 6.283;
-            // Tăng tốc độ tỏa ngang và đẩy mạnh tốc độ giật lùi (speedZ) để hạt bay xa hơn về sau
-            float radiusSpeed = 0.5 + hash(localSeed + 4.0) * 1.5;
+            // Tăng tốc độ tỏa ngang để phễu nón rộng hơn, dễ nhìn hơn
+            float radiusSpeed = 1.0 + hash(localSeed + 4.0) * 3.0;
             
             float speedX = cos(angle) * radiusSpeed;
             float speedY = sin(angle) * radiusSpeed;
@@ -349,10 +349,9 @@ export const chidoriParticleMat = new THREE.ShaderMaterial({
             
             vec3 pos = vec3(startX, startY, startZ);
             // Nhân với 1.0 (thời gian sống max)
-            // Chỉ nhân speedMultiplier vào speedZ để hạt văng ra sau nhanh hơn khi chạy nhanh, 
-            // không nhân vào X và Y để giữ nguyên góc tỏa của hình nón!
-            pos.x += speedX * t * 1.0;
-            pos.y += speedY * t * 1.0;
+            // Phải nhân speedMultiplier cho cả 3 trục X, Y, Z thì mới giữ được TỈ LỆ GÓC MỞ của hình nón!
+            pos.x += speedX * speedMultiplier * t * 1.0;
+            pos.y += speedY * speedMultiplier * t * 1.0;
             pos.z += speedZ * speedMultiplier * t * 1.0;
             
             vAlpha = 1.0; // CPU không có fade, giữ nguyên độ sáng
