@@ -351,10 +351,10 @@ export const chidoriParticleMat = new THREE.ShaderMaterial({
             pos.y += speedY * speedMultiplier * t * 0.4;
             pos.z += speedZ * speedMultiplier * t * 0.4;
             
-            vAlpha = life;
+            vAlpha = 1.0; // CPU không có fade, giữ nguyên độ sáng
             vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
             float pointZ = max(abs(mvPosition.z), 1.0);
-            gl_PointSize = size * (1000.0 / pointZ);
+            gl_PointSize = size * (400.0 / pointZ); // Hạ tỉ lệ xuống 400 để khớp với kích thước của CPU PointsMaterial
             gl_Position = projectionMatrix * mvPosition;
         }
     `,
@@ -422,10 +422,10 @@ export const susanooParticleMat = new THREE.ShaderMaterial({
             pos.y += speedY * t;
             pos.z += speedZ * t;
             
-            vAlpha = life;
+            vAlpha = 1.0; // Giữ nguyên độ sáng như CPU
             vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
             float pointZ = max(abs(mvPosition.z), 1.0);
-            gl_PointSize = size * (1000.0 / pointZ);
+            gl_PointSize = size * (400.0 / pointZ); // Hạ tỉ lệ xuống 400 để đốm sáng nhỏ lại, sắc nét như cũ
             gl_Position = projectionMatrix * mvPosition;
         }
     `,
