@@ -1,7 +1,7 @@
 import { scene, camera, controls, renderer } from './core.js';
 import { fireTex } from './assets.js';
 import { state } from './state.js';
-import { sasuke, sasukeAnimations, sasukeAnimList, susanooModel, sasukeModel, susanooMixer, middleFingerBone, rightHandBone, susanooSwordHitbox, stopSusanooAnimation } from './character.js';
+import { sasuke, susanooModel, middleFingerBone, rightHandBone, susanooMixer, susanooSwordHitbox, sasukeModel, stopSusanooAnimation, susanooLight } from './character.js';
 import { treeInstancedMeshes } from './environment.js';
 import { GLSL_NOISE } from './utils.js';
 import { MAX_PARTICLES } from './config.js';
@@ -59,6 +59,14 @@ for (let i = 0; i < MAX_PARTICLES; i++) {
     particlePool.push(p);
 }
 
+// Pool đèn cho Fireball (Tránh thêm bớt PointLight lúc runtime gây khựng hình)
+export const fireballLightsPool = [];
+for (let i = 0; i < 3; i++) {
+    let l = new THREE.PointLight(0xff4500, 0.0, 40);
+    scene.add(l);
+    fireballLightsPool.push(l);
+}
+
 export function spawnFireball(sasukePos) {
     const fireballGroup = new THREE.Group();
     const core = new THREE.Mesh(fireballCoreGeo, fireballCoreMat);
@@ -76,27 +84,30 @@ export function spawnFireball(sasukePos) {
     fireballGroup.add(aura2);
     fireballGroup.add(aura3);
 
-    const fireLight = new THREE.PointLight(0xff4500, 15.0, 40);
-    fireballGroup.add(fireLight);
+    let fireLight = fireballLightsPool.find(l => l.intensity === 0);
+    if (!fireLight) fireLight = fireballLightsPool[0]; // Dự phòng
+    fireLight.intensity = 15.0;
 
     if (sasukePos) {
         fireballGroup.position.copy(sasukePos);
         fireballGroup.position.y += 2.2;
+        fireLight.position.copy(fireballGroup.position);
     }
 
     scene.add(fireballGroup);
-    fireballs.push({ group: fireballGroup, core: core, aura1: aura1, aura2: aura2, aura3: aura3 });
+    fireballs.push({ group: fireballGroup, core: core, aura1: aura1, aura2: aura2, aura3: aura3, light: fireLight });
 }
 
 // ==========================================
 // KỸ NĂNG: CHIDORI (SKILL 2)
 // ==========================================
 
+// Khởi tạo đèn chớp cho Chidori (Đưa thẳng vào scene, ẩn bằng intensity 0 để không recompile)
+export const chidoriLight = new THREE.PointLight(0x66ccff, 0.0, 15.0); 
+scene.add(chidoriLight);
+
 export const chidoriGroup = new THREE.Group();
 chidoriGroup.visible = false;
-
-const chidoriLight = new THREE.PointLight(0x66ccff, 5.0, 15.0); // Giảm tầm chiếu sáng từ 40 xuống 15 để cứu FPS (tránh GPU phải tính toán ánh sáng cho núi và cây ở xa)
-chidoriGroup.add(chidoriLight);
 
 const chidoriCoreGeo = new THREE.IcosahedronGeometry(0.35, 2);
 export const chidoriCoreMat = new THREE.MeshBasicMaterial({
@@ -977,6 +988,8 @@ export function updateSkills(delta) {
         }
         chidoriGroup.position.copy(handPos);
         chidoriGroup.visible = true;
+        chidoriLight.intensity = 5.0;
+        chidoriLight.position.copy(handPos); // Đèn di chuyển theo tay
         coneMesh.visible = true; // Bật sét hình nón lên CÙNG LÚC với quả cầu
 
         // Đảm bảo opacity và drawRange đầy đủ khi đang cast
@@ -997,6 +1010,7 @@ export function updateSkills(delta) {
         state.chidoriFadeTimer -= delta;
         if (state.chidoriFadeTimer <= 0) {
             chidoriGroup.visible = false;
+            chidoriLight.intensity = 0.0;
             coneMesh.visible = false;
         } else {
             let ratio = state.chidoriFadeTimer / 0.1;
@@ -1119,7 +1133,7 @@ export function updateSkills(delta) {
             if (state.susanooTransformTimer <= 0) {
                 // Bung Aura, VÀ Ẩn Sasuke đi vì Susanoo là model riêng
                 if (sasukeModel) sasukeModel.visible = false;
-                import('./main.js').then(m => m.createFlameBlast()); // Gọi FlameBlast
+                createFlameBlast(); // Gọi FlameBlast
             }
         }
 
@@ -1133,9 +1147,10 @@ export function updateSkills(delta) {
             susanooParticles.visible = false; // Tắt hạt sáng
             susanooSmokeParticles.visible = false; // Tắt khói
             swordParticles.visible = false; // Tắt vệt kiếm
+            if (susanooLight) susanooLight.intensity = 0.0;
             if (sasukeModel) sasukeModel.visible = true; // Hiện lại Sasuke
             stopSusanooAnimation();
-            import('./main.js').then(m => m.createFlameBlast()); // Bùng nổ lửa tím trắng xóa khi hết Susanoo
+            createFlameBlast(); // Bùng nổ lửa tím trắng xóa khi hết Susanoo
             state.cameraTransitionTime = 1.0; // Bắt đầu chuyển đổi góc camera về Sasuke
 
             // Tắt âm thanh bay mượt mà (Có pause)
@@ -1197,6 +1212,64 @@ export function updateSkills(delta) {
             }
         });
     }
+
+    // --- HIỆU ỨNG LỬA BÙNG NỔ (AURA BLAST) ---
+    for (let i = activeBlasts.length - 1; i >= 0; i--) {
+        let b = activeBlasts[i];
+        b.life -= delta * 2.5; // Tốc độ biến mất
+
+        b.group.scale.x += delta * 12;
+        b.group.scale.z += delta * 12;
+        b.group.scale.y += delta * 15;
+        b.group.position.y += delta * 5;
+
+        b.coreMat.opacity = b.life;
+        b.outerMat.opacity = b.life * 0.8;
+        b.sphereMat.opacity = b.life * 0.9;
+
+        if (b.life <= 0) {
+            b.group.parent.remove(b.group);
+            activeBlasts.splice(i, 1);
+        }
+    }
+}
+
+export const blastCoreGeo = new THREE.CylinderGeometry(0.1, 4, 15, 32, 1, true);
+export const blastCoreMatBase = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1.0, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+
+export const blastOuterGeo = new THREE.CylinderGeometry(1, 8, 20, 32, 1, true);
+export const blastOuterMatBase = new THREE.MeshBasicMaterial({ color: 0xcc00ff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+
+export const blastSphereGeo = new THREE.SphereGeometry(4, 32, 32);
+export const blastSphereMatBase = new THREE.MeshBasicMaterial({ color: 0xaa00ff, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending });
+
+export let activeBlasts = [];
+export function createFlameBlast() {
+    let group = new THREE.Group();
+    sasuke.add(group);
+
+    let coreMat = blastCoreMatBase.clone();
+    let coreMesh = new THREE.Mesh(blastCoreGeo, coreMat);
+    coreMesh.position.y = 5;
+    group.add(coreMesh);
+
+    let outerMat = blastOuterMatBase.clone();
+    let outerMesh = new THREE.Mesh(blastOuterGeo, outerMat);
+    outerMesh.position.y = 5;
+    group.add(outerMesh);
+
+    let sphereMat = blastSphereMatBase.clone();
+    let sphereMesh = new THREE.Mesh(blastSphereGeo, sphereMat);
+    sphereMesh.position.y = 2;
+    group.add(sphereMesh);
+
+    activeBlasts.push({
+        group: group,
+        coreMat: coreMat,
+        outerMat: outerMat,
+        sphereMat: sphereMat,
+        life: 1.0
+    });
 }
 
 // ==========================================
@@ -1220,6 +1293,12 @@ export function precompileShaders() {
     dummyGroup.add(new THREE.Mesh(fireballCoreGeo, fireballCoreMat));
     dummyGroup.add(new THREE.Mesh(fireballAuraGeo, fireballAuraMat));
     dummyGroup.add(new THREE.Mesh(particleGeo, particleMat));
+
+    // Thêm vật liệu FlameBlast vào dummy để biên dịch trước
+    dummyGroup.add(new THREE.Mesh(blastCoreGeo, blastCoreMatBase));
+    dummyGroup.add(new THREE.Mesh(blastOuterGeo, blastOuterMatBase));
+    dummyGroup.add(new THREE.Mesh(blastSphereGeo, blastSphereMatBase));
+    
     scene.add(dummyGroup);
 
     // Ép WebGLRenderer dịch toàn bộ Shaders sang mã máy GPU

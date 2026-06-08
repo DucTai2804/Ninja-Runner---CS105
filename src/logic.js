@@ -3,7 +3,7 @@ import { state } from './state.js';
 import { groundPlanes, updateTreeMatrices, treeData, treeInstancedMeshes } from './environment.js';
 import { obstacleRows, spawnObstaclePattern } from './obstacles.js';
 import { TOTAL_TREES } from './config.js';
-import { sasuke, mixer, sasukeAnimations, sasukeAnimList, playAnimation, susanooModel, susanooMixer, stopSusanooAnimation } from './character.js';
+import { sasuke, mixer, sasukeAnimations, sasukeAnimList, playAnimation, susanooModel, susanooMixer, stopSusanooAnimation, susanooLight } from './character.js';
 import { fireballs, fireParticles, chidoriGroup } from './skills.js';
 import { scoreUI, coinUI, susanooBarContainer, susanooBarInner } from './ui.js';
 
@@ -33,6 +33,7 @@ export function resetGame() {
     state.susanooTimer = 0;
     if (susanooBarContainer) susanooBarContainer.style.display = 'none';
     if (susanooModel) susanooModel.visible = false;
+    if (susanooLight) susanooLight.intensity = 0.0;
     stopSusanooAnimation();
     if (window.susanooFlyAudio && window.fadeToVolume) {
         window.fadeToVolume(window.susanooFlyAudio, 0, 150, true);

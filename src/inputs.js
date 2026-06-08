@@ -1,7 +1,6 @@
-
 import { state } from './state.js';
 import { LANE_POSITIONS } from './config.js';
-import { playAnimation, sasukeAnimations, sasukeAnimList, susanooAnimations, susanooModel, sasukeHitbox, playSusanooAnimation } from './character.js';
+import { playAnimation, sasukeAnimations, sasukeAnimList, susanooAnimations, susanooModel, sasukeHitbox, playSusanooAnimation, susanooLight } from './character.js';
 import { chidoriGroup } from './skills.js';
 import { treeInstancedMeshes } from './environment.js';
 import { showHitbox, toggleHitboxes } from './physics.js';
@@ -136,11 +135,13 @@ export function setupInputs() {
         if (event.key === '3') {
             if (!state.isSusanooActive) {
                 state.isSusanooActive = true;
-                state.susanooTimer = 20.0;
+                if (susanooLight) susanooLight.intensity = 8.0; // Bật sáng Susanoo
                 
                 // Tự động chuyển nhân vật về làn giữa
                 state.currentLane = 1;
                 state.targetLaneX = LANE_POSITIONS[1];
+                
+                state.susanooTimer = 20.0;
                 
                 if (susanooBarContainer) susanooBarContainer.style.display = 'block';
                 if (susanooBarInner) susanooBarInner.style.transform = 'scaleX(1)';

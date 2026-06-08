@@ -42,42 +42,7 @@ let lastFpsTime = performance.now();
 // --- CẬP NHẬT BIẾN THỜI GIAN CHÉM KIẾM ---
 state.slashElapsedTime = 0;
 
-// Hệ thống luồng lửa bùng nổ (Aura Blast)
-export let activeBlasts = [];
-export function createFlameBlast() {
-    let group = new THREE.Group();
-    sasuke.add(group);
 
-    // Lõi lửa trắng
-    let coreGeo = new THREE.CylinderGeometry(0.1, 4, 15, 32, 1, true);
-    let coreMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1.0, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
-    let coreMesh = new THREE.Mesh(coreGeo, coreMat);
-    coreMesh.position.y = 5;
-    group.add(coreMesh);
-
-    // Vầng lửa tím
-    let outerGeo = new THREE.CylinderGeometry(1, 8, 20, 32, 1, true);
-    let outerMat = new THREE.MeshBasicMaterial({ color: 0xcc00ff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
-    let outerMesh = new THREE.Mesh(outerGeo, outerMat);
-    outerMesh.position.y = 5;
-    group.add(outerMesh);
-
-    // Quả cầu nổ ở gốc
-    let sphereGeo = new THREE.SphereGeometry(4, 32, 32);
-    let sphereMat = new THREE.MeshBasicMaterial({ color: 0xaa00ff, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending });
-    let sphereMesh = new THREE.Mesh(sphereGeo, sphereMat);
-    sphereMesh.position.y = 2;
-    group.add(sphereMesh);
-
-
-    activeBlasts.push({
-        group: group,
-        coreMat: coreMat,
-        outerMat: outerMat,
-        sphereMat: sphereMat,
-        life: 1.0 // Sống 1 giây
-    });
-}
 
 function animate() {
     requestAnimationFrame(animate);
@@ -306,24 +271,7 @@ function animate() {
     }
 
     // --- HIỆU ỨNG LỬA BÙNG NỔ (AURA BLAST) ---
-    for (let i = activeBlasts.length - 1; i >= 0; i--) {
-        let b = activeBlasts[i];
-        b.life -= delta * 2.5; // Tốc độ biến mất
-
-        b.group.scale.x += delta * 12;
-        b.group.scale.z += delta * 12;
-        b.group.scale.y += delta * 15;
-        b.group.position.y += delta * 5;
-
-        b.coreMat.opacity = b.life;
-        b.outerMat.opacity = b.life * 0.8;
-        b.sphereMat.opacity = b.life * 0.9;
-
-        if (b.life <= 0) {
-            b.group.parent.remove(b.group);
-            activeBlasts.splice(i, 1);
-        }
-    }
+    // Đã được chuyển vào skills.js
 
     // --- CAMERA PANNING & ZOOM (SUBWAY SURFERS STYLE) ---
     if (sasuke && typeof controls !== 'undefined' && controls) {

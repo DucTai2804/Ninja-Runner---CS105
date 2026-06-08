@@ -230,6 +230,8 @@ export function stopSusanooAnimation() {
     currentSusanooAction = null;
 }
 
+export const susanooLight = new THREE.PointLight(0x8A00FF, 0.0, 80); // Đặt cường độ 0
+
 gltfLoader.load('models/Characters/sasuke/susanoo_animation_clean.glb', function (gltf) {
     susanooModel = gltf.scene;
     susanooModel.visible = false;
@@ -237,10 +239,9 @@ gltfLoader.load('models/Characters/sasuke/susanoo_animation_clean.glb', function
     susanooModel.position.y = 17.0;
     susanooModel.rotation.y = Math.PI;
 
-    // Tích hợp Đèn chiếu sáng cho Susanoo
-    const susanooLight = new THREE.PointLight(0x8A00FF, 8.0, 80);
+    // Tích hợp Đèn chiếu sáng cho Susanoo (Thêm vào sasuke thay vì susanooModel để luôn nằm trong cảnh, tránh biên dịch lại Shader)
     susanooLight.position.set(0, 3, 0);
-    susanooModel.add(susanooLight);
+    sasuke.add(susanooLight);
 
     let auraMeshesToAdd = [];
 
