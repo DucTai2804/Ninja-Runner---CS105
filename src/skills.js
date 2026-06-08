@@ -354,7 +354,7 @@ export const chidoriParticleMat = new THREE.ShaderMaterial({
             vAlpha = life;
             vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
             float pointZ = max(abs(mvPosition.z), 1.0);
-            gl_PointSize = size * (300.0 / pointZ);
+            gl_PointSize = size * (1000.0 / pointZ);
             gl_Position = projectionMatrix * mvPosition;
         }
     `,
@@ -425,7 +425,7 @@ export const susanooParticleMat = new THREE.ShaderMaterial({
             vAlpha = life;
             vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
             float pointZ = max(abs(mvPosition.z), 1.0);
-            gl_PointSize = size * (300.0 / pointZ);
+            gl_PointSize = size * (1000.0 / pointZ);
             gl_Position = projectionMatrix * mvPosition;
         }
     `,
@@ -585,7 +585,8 @@ export const susanooSmokeMat = new THREE.ShaderMaterial({
     blending: THREE.AdditiveBlending
 });
 
-export const susanooSmokeParticles = new THREE.Mesh(susanooSmokeGeo, susanooSmokeMat);
+// QUAN TRỌNG: Phải dùng THREE.InstancedMesh thay vì THREE.Mesh để WebGL không bị crash khi vẽ InstancedBufferAttribute
+export const susanooSmokeParticles = new THREE.InstancedMesh(susanooSmokeGeo, susanooSmokeMat, susanooSmokeCount);
 susanooSmokeParticles.position.y = 32.0;
 susanooSmokeParticles.frustumCulled = false; // Ngăn chặn tự động ẩn khi camera quay đi
 susanooSmokeParticles.visible = false;
