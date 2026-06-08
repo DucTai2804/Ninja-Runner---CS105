@@ -327,8 +327,8 @@ export const chidoriParticleMat = new THREE.ShaderMaterial({
         float hash(float n) { return fract(sin(n) * 12345.6789); }
         
         void main() {
-            // Giảm xuống 1.0 để sống trọn vẹn 1.0s
-            float rawLife = hash(seed.x) - time * 1.0;
+            // Tăng lên 1.5 (sống ~0.66s) để chuỗi hạt văng ra sau bớt dài lại
+            float rawLife = hash(seed.x) - time * 1.5;
             float cycle = floor(rawLife);
             float life = fract(rawLife); // 1.0 -> 0.0
             float t = 1.0 - life; // 0.0 -> 1.0
@@ -348,11 +348,11 @@ export const chidoriParticleMat = new THREE.ShaderMaterial({
             float speedZ = 5.0 + hash(localSeed + 5.0) * 7.0; // Phóng ra sau cực mạnh
             
             vec3 pos = vec3(startX, startY, startZ);
-            // Nhân với 1.0 (thời gian sống max)
+            // Nhân với 0.66 (thời gian sống max)
             // Phải nhân speedMultiplier cho cả 3 trục X, Y, Z thì mới giữ được TỈ LỆ GÓC MỞ của hình nón!
-            pos.x += speedX * speedMultiplier * t * 1.0;
-            pos.y += speedY * speedMultiplier * t * 1.0;
-            pos.z += speedZ * speedMultiplier * t * 1.0;
+            pos.x += speedX * speedMultiplier * t * 0.66;
+            pos.y += speedY * speedMultiplier * t * 0.66;
+            pos.z += speedZ * speedMultiplier * t * 0.66;
             
             vAlpha = 1.0; // CPU không có fade, giữ nguyên độ sáng
             vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
