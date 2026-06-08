@@ -10,6 +10,8 @@ import { MAX_PARTICLES } from './config.js';
 // KỸ NĂNG: ĐẠI HỎA CẦU (SKILL 1)
 // ==========================================
 
+let globalSkillTime = 0; // Thêm biến lưu trữ thời gian tổng cho Shader
+
 export let fireballs = [];
 export let fireParticles = [];
 export let particlePool = [];
@@ -93,7 +95,7 @@ export function spawnFireball(sasukePos) {
 export const chidoriGroup = new THREE.Group();
 chidoriGroup.visible = false;
 
-const chidoriLight = new THREE.PointLight(0x66ccff, 5.0, 40);
+const chidoriLight = new THREE.PointLight(0x66ccff, 5.0, 15.0); // Giảm tầm chiếu sáng từ 40 xuống 15 để cứu FPS (tránh GPU phải tính toán ánh sáng cho núi và cây ở xa)
 chidoriGroup.add(chidoriLight);
 
 const chidoriCoreGeo = new THREE.IcosahedronGeometry(0.35, 2);
@@ -116,32 +118,149 @@ export const chidoriInnerMat = new THREE.MeshBasicMaterial({
 export const chidoriInner = new THREE.Mesh(chidoriInnerGeo, chidoriInnerMat);
 chidoriGroup.add(chidoriInner);
 
-export const sparkMaterial = new THREE.LineBasicMaterial({ color: 0x33ccff, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending });
-export const sparksLines = [];
-export const sparksCount = 30;
-export const sparksGroup = new THREE.Group();
-chidoriGroup.add(sparksGroup);
-for (let i = 0; i < sparksCount; i++) {
-    let geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(4 * 3), 3));
-    let line = new THREE.Line(geo, sparkMaterial);
-    sparksGroup.add(line);
-    sparksLines.push(line);
+// Kỹ thuật GPU Lightning: Gộp toàn bộ tia sét vào 1 BufferGeometry duy nhất
+function createGPULightning(lineCount, pointsPerLine, isCone) {
+    const segmentsPerLine = pointsPerLine - 1;
+    const vertexCount = lineCount * segmentsPerLine * 2;
+    
+    const positions = new Float32Array(vertexCount * 3);
+    const pointIndices = new Float32Array(vertexCount);
+    const seeds = new Float32Array(vertexCount * 3);
+    const params = new Float32Array(vertexCount * 3); // angle, radiusBase, backwardTotal
+
+    let vIdx = 0;
+    for (let i = 0; i < lineCount; i++) {
+        let seedX = Math.random() * 100.0;
+        let seedY = Math.random() * 100.0;
+        let seedZ = Math.random() * 100.0;
+        
+        let angle = Math.random() * Math.PI * 2;
+        let radiusBase = Math.random() * 3.5;
+        let backwardTotal = Math.random() * 8.0 + 4.0;
+        
+        for (let j = 0; j < segmentsPerLine; j++) {
+            // Đỉnh 1 của đoạn thẳng
+            pointIndices[vIdx] = j;
+            seeds[vIdx * 3] = seedX; seeds[vIdx * 3 + 1] = seedY; seeds[vIdx * 3 + 2] = seedZ;
+            params[vIdx * 3] = angle; params[vIdx * 3 + 1] = radiusBase; params[vIdx * 3 + 2] = backwardTotal;
+            vIdx++;
+            
+            // Đỉnh 2 của đoạn thẳng
+            pointIndices[vIdx] = j + 1;
+            seeds[vIdx * 3] = seedX; seeds[vIdx * 3 + 1] = seedY; seeds[vIdx * 3 + 2] = seedZ;
+            params[vIdx * 3] = angle; params[vIdx * 3 + 1] = radiusBase; params[vIdx * 3 + 2] = backwardTotal;
+            vIdx++;
+        }
+    }
+    
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute('pointIndex', new THREE.BufferAttribute(pointIndices, 1));
+    geo.setAttribute('seed', new THREE.BufferAttribute(seeds, 3));
+    if (isCone) geo.setAttribute('params', new THREE.BufferAttribute(params, 3));
+    
+    return geo;
 }
 
+const lightningFragmentShader = `
+    uniform vec3 color;
+    uniform float opacity;
+    varying float vAlpha;
+    void main() {
+        if(vAlpha < 0.5) discard;
+        gl_FragColor = vec4(color, opacity);
+    }
+`;
+
+export const sparksCount = 30;
+const sparksGeo = createGPULightning(sparksCount, 4, false);
+export const sparksMat = new THREE.ShaderMaterial({
+    uniforms: {
+        time: { value: 0 },
+        drawRatio: { value: 4.0 }, // 4 điểm
+        color: { value: new THREE.Color(0x33ccff) },
+        opacity: { value: 0.9 }
+    },
+    vertexShader: `
+        uniform float time;
+        uniform float drawRatio;
+        attribute float pointIndex;
+        attribute vec3 seed;
+        varying float vAlpha;
+        
+        float hash(float n) { return fract(sin(n) * 43758.5453123); }
+        
+        void main() {
+            vAlpha = (pointIndex <= drawRatio) ? 1.0 : 0.0;
+            float t = floor(time * 30.0); // Rung giật 30 lần/giây
+            
+            float px = 0.0; float py = 0.0; float pz = -0.35;
+            for(int i = 1; i <= 4; i++) {
+                if(float(i) > pointIndex) break;
+                px += (hash(seed.x + float(i) * 1.2 + t) - 0.5) * 1.5;
+                py += (hash(seed.y + float(i) * 1.5 + t) - 0.5) * 1.5;
+                pz += (hash(seed.z + float(i) * 1.1 + t) * 0.8 + 0.2) * 2.0;
+            }
+            
+            vec3 finalPos = vec3(px, py, pz);
+            if(pointIndex == 0.0) finalPos = vec3(0.0, 0.0, -0.35);
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(finalPos, 1.0);
+        }
+    `,
+    fragmentShader: lightningFragmentShader,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false
+});
+export const sparksMesh = new THREE.LineSegments(sparksGeo, sparksMat);
+chidoriGroup.add(sparksMesh);
+
 export const coneLightningCount = 20;
-export const coneLightningMat = new THREE.LineBasicMaterial({ color: 0x66eeff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending });
-export const coneLightningLines = [];
-export const coneGroup = new THREE.Group();
-coneGroup.visible = false;
-chidoriGroup.add(coneGroup);
-for (let i = 0; i < coneLightningCount; i++) {
-    let geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(5 * 3), 3));
-    let line = new THREE.Line(geo, coneLightningMat);
-    coneGroup.add(line);
-    coneLightningLines.push(line);
-}
+const coneGeo = createGPULightning(coneLightningCount, 5, true);
+export const coneLightningMat = new THREE.ShaderMaterial({
+    uniforms: {
+        time: { value: 0 },
+        drawRatio: { value: 5.0 }, // 5 điểm
+        color: { value: new THREE.Color(0x66eeff) },
+        opacity: { value: 0.8 }
+    },
+    vertexShader: `
+        uniform float time;
+        uniform float drawRatio;
+        attribute float pointIndex;
+        attribute vec3 seed;
+        attribute vec3 params; // angle, radiusBase, backwardTotal
+        varying float vAlpha;
+        
+        float hash(float n) { return fract(sin(n) * 43758.5453123); }
+        
+        void main() {
+            vAlpha = (pointIndex <= drawRatio) ? 1.0 : 0.0;
+            float t = floor(time * 30.0); 
+            
+            float angle = params.x; float radiusBase = params.y; float backwardTotal = params.z;
+            float px = 0.0; float py = 0.0; float pz = -0.35;
+            
+            for(int i = 1; i <= 5; i++) {
+                if(float(i) > pointIndex) break;
+                px += cos(angle) * (radiusBase / 4.0) + (hash(seed.x + float(i) * 1.2 + t) - 0.5) * 1.5;
+                py += sin(angle) * (radiusBase / 4.0) + (hash(seed.y + float(i) * 1.5 + t) - 0.5) * 1.5;
+                pz += (backwardTotal / 4.0);
+            }
+            
+            vec3 finalPos = vec3(px, py, pz);
+            if(pointIndex == 0.0) finalPos = vec3(0.0, 0.0, -0.35);
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(finalPos, 1.0);
+        }
+    `,
+    fragmentShader: lightningFragmentShader,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false
+});
+export const coneMesh = new THREE.LineSegments(coneGeo, coneLightningMat);
+coneMesh.visible = false;
+chidoriGroup.add(coneMesh);
 
 // Tạo Texture hình cầu phát sáng (Radial Gradient)
 function createGlowingParticleTexture(r = 102, g = 238, b = 255) {
@@ -175,68 +294,160 @@ function createSmokeTexture(r = 255, g = 255, b = 255) {
     return new THREE.CanvasTexture(canvas);
 }
 
-// Đốm sáng (Particles) cho Chidori
+// Đốm sáng (Particles) cho Chidori (Tối ưu hóa GPU)
 export const chidoriParticleCount = 40;
 export const chidoriParticleGeo = new THREE.BufferGeometry();
-export const chidoriParticlePositions = new Float32Array(chidoriParticleCount * 3);
-export const chidoriParticleData = [];
+const chidoriParticlePositions = new Float32Array(chidoriParticleCount * 3);
+const chidoriParticleSeeds = new Float32Array(chidoriParticleCount * 3);
+
 for (let i = 0; i < chidoriParticleCount; i++) {
-    chidoriParticlePositions[i * 3] = 0;
-    chidoriParticlePositions[i * 3 + 1] = 0;
-    chidoriParticlePositions[i * 3 + 2] = 0;
-    let angle = Math.random() * Math.PI * 2;
-    let radiusSpeed = 0.2 + Math.random() * 0.8; // Tốc độ mở rộng ngang (bằng một nửa tia sét lớn)
-    
-    chidoriParticleData.push({
-        life: Math.random(),
-        speedX: Math.cos(angle) * radiusSpeed,
-        speedY: Math.sin(angle) * radiusSpeed,
-        speedZ: 2.0 + Math.random() * 3.0 // Tốc độ lùi về sau
-    });
+    chidoriParticleSeeds[i * 3] = Math.random() * 100.0;
+    chidoriParticleSeeds[i * 3 + 1] = Math.random() * 100.0;
+    chidoriParticleSeeds[i * 3 + 2] = Math.random() * 100.0;
 }
 chidoriParticleGeo.setAttribute('position', new THREE.BufferAttribute(chidoriParticlePositions, 3));
-export const chidoriParticleMat = new THREE.PointsMaterial({
-    color: 0xffffff, // Màu được quy định trong texture rồi
-    size: 0.35, // Tăng kích thước đốm để dễ thấy hơn
-    map: createGlowingParticleTexture(),
+chidoriParticleGeo.setAttribute('seed', new THREE.BufferAttribute(chidoriParticleSeeds, 3));
+
+export const chidoriParticleMat = new THREE.ShaderMaterial({
+    uniforms: {
+        time: { value: 0 },
+        speedMultiplier: { value: 1.0 },
+        particleTex: { value: createGlowingParticleTexture() },
+        opacity: { value: 1.0 },
+        size: { value: 0.35 }
+    },
+    vertexShader: `
+        uniform float time;
+        uniform float speedMultiplier;
+        uniform float size;
+        attribute vec3 seed;
+        
+        varying float vAlpha;
+        
+        float hash(float n) { return fract(sin(n) * 12345.6789); }
+        
+        void main() {
+            float life = fract(hash(seed.x) - time * 2.5); // 1.0 -> 0.0
+            float t = 1.0 - life; // 0.0 -> 1.0
+            
+            float startX = (hash(seed.y) - 0.5) * 0.4;
+            float startY = (hash(seed.z) - 0.5) * 0.4;
+            float startZ = -0.3;
+            
+            float angle = hash(seed.x * 2.0) * 6.283;
+            float radiusSpeed = 0.2 + hash(seed.y * 2.0) * 0.8;
+            
+            float speedX = cos(angle) * radiusSpeed;
+            float speedY = sin(angle) * radiusSpeed;
+            float speedZ = 2.0 + hash(seed.z * 2.0) * 3.0;
+            
+            vec3 pos = vec3(startX, startY, startZ);
+            // 0.4 is max lifetime (1.0 / 2.5)
+            pos.x += speedX * speedMultiplier * t * 0.4;
+            pos.y += speedY * speedMultiplier * t * 0.4;
+            pos.z += speedZ * speedMultiplier * t * 0.4;
+            
+            vAlpha = life;
+            vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+            float pointZ = max(abs(mvPosition.z), 1.0);
+            gl_PointSize = size * (300.0 / pointZ);
+            gl_Position = projectionMatrix * mvPosition;
+        }
+    `,
+    fragmentShader: `
+        uniform sampler2D particleTex;
+        uniform float opacity;
+        varying float vAlpha;
+        void main() {
+            vec4 texColor = texture2D(particleTex, gl_PointCoord);
+            gl_FragColor = vec4(texColor.rgb, texColor.a * vAlpha * opacity);
+        }
+    `,
     transparent: true,
-    opacity: 1.0,
     blending: THREE.AdditiveBlending,
     depthWrite: false
 });
 export const chidoriParticles = new THREE.Points(chidoriParticleGeo, chidoriParticleMat);
 chidoriGroup.add(chidoriParticles);
 
-// Đốm sáng (Particles) cho Susanoo
+// Đốm sáng (Particles) cho Susanoo (Tối ưu hóa GPU)
 export const susanooParticleCount = 80;
 export const susanooParticleGeo = new THREE.BufferGeometry();
-export const susanooParticlePositions = new Float32Array(susanooParticleCount * 3);
-export const susanooParticleData = [];
+const susanooParticlePositions = new Float32Array(susanooParticleCount * 3);
+const susanooParticleSeeds = new Float32Array(susanooParticleCount * 3);
+
 for (let i = 0; i < susanooParticleCount; i++) {
-    susanooParticlePositions[i * 3] = (Math.random() - 0.5) * 20.0;
-    susanooParticlePositions[i * 3 + 1] = Math.random() * 20.0; // Giảm độ cao khởi tạo để không bay quá cao
-    susanooParticlePositions[i * 3 + 2] = (Math.random() - 0.5) * 20.0;
-    
-    susanooParticleData.push({
-        life: Math.random(),
-        speedX: (Math.random() - 0.5) * 1.5,
-        speedY: 10.0 + Math.random() * 10.0, // Tăng tốc độ chảy lên trên cực mạnh (10 đến 20 m/s)
-        speedZ: (Math.random() - 0.5) * 1.5
-    });
+    susanooParticleSeeds[i * 3] = Math.random() * 100.0;
+    susanooParticleSeeds[i * 3 + 1] = Math.random() * 100.0;
+    susanooParticleSeeds[i * 3 + 2] = Math.random() * 100.0;
 }
 susanooParticleGeo.setAttribute('position', new THREE.BufferAttribute(susanooParticlePositions, 3));
-export const susanooParticleMat = new THREE.PointsMaterial({
-    color: 0xffffff, // Để nguyên màu trắng để kết cấu tự phát sáng màu tím
-    size: 0.6, // Trả lại kích thước như cũ
-    map: createGlowingParticleTexture(255, 119, 255), // Sắc tím sáng rực rỡ của lõi kiếm (0xFF77FF)
+susanooParticleGeo.setAttribute('seed', new THREE.BufferAttribute(susanooParticleSeeds, 3));
+
+export const susanooParticleMat = new THREE.ShaderMaterial({
+    uniforms: {
+        time: { value: 0 },
+        particleTex: { value: createGlowingParticleTexture(255, 119, 255) },
+        opacity: { value: 0.8 },
+        size: { value: 0.6 }
+    },
+    vertexShader: `
+        uniform float time;
+        uniform float size;
+        attribute vec3 seed;
+        varying float vAlpha;
+        float hash(float n) { return fract(sin(n) * 12345.6789); }
+        void main() {
+            float life = fract(hash(seed.x) - time * 1.0); // 1.0 -> 0.0
+            float t = 1.0 - life;
+            
+            float startX = (hash(seed.y) - 0.5) * 20.0;
+            float startY = hash(seed.z) * 20.0;
+            float startZ = (hash(seed.x * 2.0) - 0.5) * 20.0;
+            
+            float speedX = (hash(seed.y * 2.0) - 0.5) * 1.5;
+            float speedY = 10.0 + hash(seed.z * 2.0) * 10.0;
+            float speedZ = (hash(seed.x * 3.0) - 0.5) * 1.5;
+            
+            vec3 pos = vec3(startX, startY, startZ);
+            pos.x += speedX * t; // duration is 1.0s
+            pos.y += speedY * t;
+            pos.z += speedZ * t;
+            
+            vAlpha = life;
+            vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+            float pointZ = max(abs(mvPosition.z), 1.0);
+            gl_PointSize = size * (300.0 / pointZ);
+            gl_Position = projectionMatrix * mvPosition;
+        }
+    `,
+    fragmentShader: `
+        uniform sampler2D particleTex;
+        uniform float opacity;
+        varying float vAlpha;
+        void main() {
+            vec4 texColor = texture2D(particleTex, gl_PointCoord);
+            gl_FragColor = vec4(texColor.rgb, texColor.a * vAlpha * opacity);
+        }
+    `,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false
+});
+export const susanooParticles = new THREE.Points(susanooParticleGeo, susanooParticleMat);
+susanooParticles.position.y = 10.0;
+susanooParticles.visible = false;
+
+// Vì swordParticles vẫn ở lại CPU nên cần có material riêng (trước đây xài chung susanooParticleMat)
+const swordParticleMat = new THREE.PointsMaterial({
+    color: 0xffffff,
+    size: 0.6,
+    map: createGlowingParticleTexture(255, 119, 255),
     transparent: true,
     opacity: 0.8,
     blending: THREE.AdditiveBlending,
     depthWrite: false
 });
-export const susanooParticles = new THREE.Points(susanooParticleGeo, susanooParticleMat);
-susanooParticles.position.y = 10.0; // Dời lên trên cho khớp với trọng tâm của Susanoo
-susanooParticles.visible = false;
 
 // Đốm sáng (Particles) cho kiếm Susanoo chuyển động theo quán tính
 export const swordParticleCount = 100;
@@ -256,55 +467,116 @@ for (let i = 0; i < swordParticleCount; i++) {
     });
 }
 swordParticleGeo.setAttribute('position', new THREE.BufferAttribute(swordParticlePositions, 3));
-export const swordParticles = new THREE.Points(swordParticleGeo, susanooParticleMat); // Dùng lại vầng hào quang tím
+export const swordParticles = new THREE.Points(swordParticleGeo, swordParticleMat);
 swordParticles.frustumCulled = false; // QUAN TRỌNG: Ngăn Three.js culling vì bounding sphere ban đầu ở 9999
 swordParticles.visible = false;
 
-// Khói ảo ảnh (Smoke) quanh chân và người Susanoo
-export const susanooSmokeCount = 25; // Giảm số lượng xuống 25 để tránh tụt FPS (Fill rate trên GPU)
-export const susanooSmokeParticles = new THREE.Group(); 
-susanooSmokeParticles.position.y = 32.0; 
-susanooSmokeParticles.visible = false;
+// GPU Instanced Smoke: Gộp 25 Sprite vào 1 InstancedBufferGeometry để GPU tự tính toán vật lý
+export const susanooSmokeCount = 25; 
+const susanooSmokeGeo = new THREE.InstancedBufferGeometry();
+susanooSmokeGeo.copy(new THREE.PlaneGeometry(1, 1)); // Mặt phẳng vuông 1x1
 
-export const susanooSmokeData = [];
-const smokeMat = new THREE.SpriteMaterial({
-    map: createSmokeTexture(255, 255, 255),
-    color: 0x5a0099, // Màu tím đậm đà, không quá đen để tránh bị bẩn, cũng không quá trắng để bị chói
-    transparent: true,
-    opacity: 0.3, // Tăng opacity gốc lên 0.3
-    depthWrite: false,
-    blending: THREE.AdditiveBlending 
-});
+const smokeOffsets = new Float32Array(susanooSmokeCount * 3);
+const smokeParams = new Float32Array(susanooSmokeCount * 4); // x: seed, y: speedY, z: baseScale, w: rotSpeed
 
 for (let i = 0; i < susanooSmokeCount; i++) {
-    let sprite = new THREE.Sprite(smokeMat.clone()); // Cần clone để điều khiển opacity từng hạt
+    // Offset ban đầu bao quanh thân
+    smokeOffsets[i * 3] = (Math.random() - 0.5) * 8.0;
+    smokeOffsets[i * 3 + 1] = (Math.random() - 0.5) * 16.0;
+    smokeOffsets[i * 3 + 2] = (Math.random() - 0.5) * 8.0;
     
-    let size = 6.0 + Math.random() * 8.0; // Khói ôm sát, nhỏ gọn hơn (6m - 14m)
-    sprite.scale.set(size, size, size);
-    
-    sprite.position.set(
-        (Math.random() - 0.5) * 8.0, // X cực kỳ ôm sát thân (rộng 8m)
-        (Math.random() - 0.5) * 16.0, // Y trải từ eo đến đầu (-8m đến 8m so với tâm Y=18)
-        (Math.random() - 0.5) * 8.0  // Z cực kỳ ôm sát thân
-    );
-    
-    // Xoay khói ngẫu nhiên
-    sprite.material.rotation = Math.random() * Math.PI * 2;
-    
-    susanooSmokeParticles.add(sprite);
-    
-    susanooSmokeData.push({
-        sprite: sprite,
-        baseScale: size,
-        life: Math.random(),
-        speedY: 4.0 + Math.random() * 5.0, // Bay lên nhanh hơn để tạo hiệu ứng luồng khí
-        speedX: (Math.random() - 0.5) * 1.5,
-        speedZ: (Math.random() - 0.5) * 1.5,
-        rotSpeed: (Math.random() - 0.5) * 2.0, // Xoay rõ rệt hơn
-        decay: 0.4 + Math.random() * 0.4,
-        angleTime: Math.random() * Math.PI * 2 // Dùng để tạo lượn sóng
-    });
+    // Params
+    smokeParams[i * 4] = Math.random() * 100.0; // seed
+    smokeParams[i * 4 + 1] = 4.0 + Math.random() * 5.0; // speedY
+    smokeParams[i * 4 + 2] = 6.0 + Math.random() * 8.0; // baseScale
+    smokeParams[i * 4 + 3] = (Math.random() - 0.5) * 2.0; // rotSpeed
 }
+
+susanooSmokeGeo.setAttribute('instanceOffset', new THREE.InstancedBufferAttribute(smokeOffsets, 3));
+susanooSmokeGeo.setAttribute('instanceParams', new THREE.InstancedBufferAttribute(smokeParams, 4));
+
+export const susanooSmokeMat = new THREE.ShaderMaterial({
+    uniforms: {
+        time: { value: 0 },
+        smokeTex: { value: createSmokeTexture(255, 255, 255) },
+        color: { value: new THREE.Color(0x5a0099) }
+    },
+    vertexShader: `
+        uniform float time;
+        attribute vec3 instanceOffset;
+        attribute vec4 instanceParams;
+        
+        varying vec2 vUv;
+        varying float vAlpha;
+        
+        float hash(float n) { return fract(sin(n) * 12345.6789); }
+        
+        void main() {
+            vUv = uv;
+            float seed = instanceParams.x;
+            float baseSpeedY = instanceParams.y;
+            float baseScale = instanceParams.z;
+            float rotSpeed = instanceParams.w;
+            
+            // Calculate looping life: 1.0 -> 0.0
+            float decay = 0.4 + hash(seed) * 0.4;
+            float life = fract(hash(seed + 10.0) - time * decay);
+            float lifeInv = 1.0 - life;
+            
+            // Movement
+            float speedX = (hash(seed + 1.0) - 0.5) * 1.5;
+            float speedZ = (hash(seed + 2.0) - 0.5) * 1.5;
+            float angleTime = hash(seed + 3.0) * 6.28 + time * 2.0;
+            
+            vec3 pos = instanceOffset;
+            pos.x += speedX * lifeInv * 8.0;
+            pos.y += baseSpeedY * lifeInv * 8.0;
+            pos.z += (speedZ + cos(angleTime) * 0.5) * lifeInv * 8.0;
+            
+            // Smooth alpha
+            if (life > 0.8) vAlpha = (1.0 - life) / 0.2;
+            else if (life < 0.3) vAlpha = life / 0.3;
+            else vAlpha = 1.0;
+            vAlpha *= 0.3; // Max opacity 0.3
+            
+            // Scale up
+            float currentScale = baseScale * (1.0 + lifeInv * 0.3);
+            
+            // Billboarding
+            vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+            
+            // Rotation
+            float rot = rotSpeed * time;
+            float c = cos(rot);
+            float s = sin(rot);
+            mat2 rotMat = mat2(c, -s, s, c);
+            
+            vec2 rotatedPos = rotMat * position.xy;
+            mvPosition.xy += rotatedPos * currentScale;
+            
+            gl_Position = projectionMatrix * mvPosition;
+        }
+    `,
+    fragmentShader: `
+        uniform sampler2D smokeTex;
+        uniform vec3 color;
+        varying vec2 vUv;
+        varying float vAlpha;
+        
+        void main() {
+            vec4 texColor = texture2D(smokeTex, vUv);
+            gl_FragColor = vec4(color, texColor.a * vAlpha);
+        }
+    `,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending
+});
+
+export const susanooSmokeParticles = new THREE.Mesh(susanooSmokeGeo, susanooSmokeMat);
+susanooSmokeParticles.position.y = 32.0;
+susanooSmokeParticles.frustumCulled = false; // Ngăn chặn tự động ẩn khi camera quay đi
+susanooSmokeParticles.visible = false;
 
 // ==========================================
 // KỸ NĂNG: SUSANOO (SKILL 3) VÀ QUÁN TÍNH
@@ -647,53 +919,13 @@ export function setSusanooSwordMesh(mesh) {
 }
 
 export function updateSkills(delta) {
-    // --- SKILL 1 (HỎA CẦU) ---
-    if (state.fireballSpawnDelay > 0) {
-        state.fireballSpawnDelay -= delta;
-        if (state.fireballSpawnDelay <= 0) {
-            spawnFireball(sasuke.position);
-        }
-    }
+    globalSkillTime += delta;
 
     // --- SKILL 2 (CHIDORI) ---
     if (state.isCastingChidori || state.chidoriFadeTimer > 0) {
-        // Cập nhật ziczac liên tục (cả khi đang cast và đang fade để nó giật giật đến lúc mất hẳn)
-        for (let i = 0; i < sparksCount; i++) {
-            let pos = sparksLines[i].geometry.attributes.position.array;
-            // Điểm bắt đầu dời về phía trước (trục -Z) ngay mép quả cầu chỗ các ngón tay
-            let px = 0, py = 0, pz = -0.35;
-            for (let j = 0; j < 4; j++) {
-                pos[j * 3] = px;
-                pos[j * 3 + 1] = py;
-                pos[j * 3 + 2] = pz;
-                // Tăng độ dài tia sét bao quanh và ép xu hướng ngả về sau (trục Z dương)
-                px += (Math.random() - 0.5) * 1.5;
-                py += (Math.random() - 0.5) * 1.5;
-                pz += (Math.random() * 0.8 + 0.2) * 2.0; // Luôn đẩy giá trị Z lên dương để quặt ra sau
-            }
-            sparksLines[i].geometry.attributes.position.needsUpdate = true;
-        }
-
-        for (let i = 0; i < coneLightningCount; i++) {
-            let pos = coneLightningLines[i].geometry.attributes.position.array;
-            let angle = Math.random() * Math.PI * 2;
-            let radiusBase = Math.random() * 3.5;
-            let backwardTotal = Math.random() * 8.0 + 4.0; // Dài 4-12m
-
-            // Điểm bắt đầu dời về phía trước (trục -Z) ngay mép quả cầu chỗ các ngón tay
-            let curX = 0, curY = 0, curZ = -0.35;
-
-            for (let j = 0; j < 5; j++) {
-                pos[j * 3] = curX;
-                pos[j * 3 + 1] = curY;
-                pos[j * 3 + 2] = curZ;
-
-                curX += Math.cos(angle) * (radiusBase / 4) + (Math.random() - 0.5) * 1.5;
-                curY += Math.sin(angle) * (radiusBase / 4) + (Math.random() - 0.5) * 1.5;
-                curZ += (backwardTotal / 4); // Hướng ra sau
-            }
-            coneLightningLines[i].geometry.attributes.position.needsUpdate = true;
-        }
+        // GPU Lightning: Chỉ việc cập nhật biến time cho shader chạy, CPU không cần làm gì cả!
+        sparksMat.uniforms.time.value = globalSkillTime;
+        coneLightningMat.uniforms.time.value = globalSkillTime;
     }
 
     if (state.isCastingChidori) {
@@ -714,16 +946,14 @@ export function updateSkills(delta) {
         }
         chidoriGroup.position.copy(handPos);
         chidoriGroup.visible = true;
-        coneGroup.visible = true; // Bật sét hình nón lên CÙNG LÚC với quả cầu
+        coneMesh.visible = true; // Bật sét hình nón lên CÙNG LÚC với quả cầu
 
         // Đảm bảo opacity và drawRange đầy đủ khi đang cast
         chidoriCoreMat.opacity = 0.8;
         chidoriInnerMat.opacity = 1.0;
-        sparkMaterial.opacity = 0.9;
-        coneLightningMat.opacity = 0.8;
+        sparksMat.uniforms.drawRatio.value = 4.0;
+        coneLightningMat.uniforms.drawRatio.value = 5.0;
         chidoriParticleMat.opacity = 1.0;
-        for (let i = 0; i < sparksLines.length; i++) sparksLines[i].geometry.setDrawRange(0, 4);
-        for (let i = 0; i < coneLightningLines.length; i++) coneLightningLines[i].geometry.setDrawRange(0, 5);
 
         // Hết giờ cast an toàn
         if (state.chidoriTimer <= 0) {
@@ -736,58 +966,25 @@ export function updateSkills(delta) {
         state.chidoriFadeTimer -= delta;
         if (state.chidoriFadeTimer <= 0) {
             chidoriGroup.visible = false;
-            coneGroup.visible = false;
+            coneMesh.visible = false;
         } else {
             let ratio = state.chidoriFadeTimer / 0.1;
             // Khối cầu mờ dần đi
             chidoriCoreMat.opacity = 0.8 * ratio;
             chidoriInnerMat.opacity = 1.0 * ratio;
 
-            // Các tia sét biến mất từng khúc (giảm số điểm được vẽ)
-            let sparkPointsToDraw = Math.max(1, Math.ceil(ratio * 4));
-            for (let i = 0; i < sparksLines.length; i++) {
-                sparksLines[i].geometry.setDrawRange(0, sparkPointsToDraw);
-            }
-            
-            let conePointsToDraw = Math.max(1, Math.ceil(ratio * 5));
-            for (let i = 0; i < coneLightningLines.length; i++) {
-                coneLightningLines[i].geometry.setDrawRange(0, conePointsToDraw);
-            }
+            // Các tia sét biến mất từng khúc (fade drawRatio)
+            sparksMat.uniforms.drawRatio.value = Math.max(0.0, ratio * 4.0);
+            coneLightningMat.uniforms.drawRatio.value = Math.max(0.0, ratio * 5.0);
             chidoriParticleMat.opacity = 0.8 * ratio;
         }
     }
 
-    // Cập nhật các đốm sáng bay về phía sau (cập nhật liên tục khi đang cast hoặc đang fade)
+    // Cập nhật đốm sáng Chidori (GPU Particles)
     if (state.isCastingChidori || state.chidoriFadeTimer > 0) {
-        let positions = chidoriParticles.geometry.attributes.position.array;
-        for (let i = 0; i < chidoriParticleCount; i++) {
-            let pData = chidoriParticleData[i];
-            pData.life -= delta * 2.5; // Tăng tốc độ lão hóa để đốm sáng biến mất ngang với điểm cuối tia sét
-            if (pData.life <= 0) {
-                pData.life = 1.0;
-                // Hồi sinh đốm sáng ở trung tâm quả cầu (tay Sasuke)
-                positions[i * 3] = (Math.random() - 0.5) * 0.4;
-                positions[i * 3 + 1] = (Math.random() - 0.5) * 0.4;
-                positions[i * 3 + 2] = -0.3; // Bắt đầu dịch ra trước tay một chút giống các tia sét
-                
-                // Gán lại quỹ đạo hình nón mới
-                let angle = Math.random() * Math.PI * 2;
-                let radiusSpeed = 0.2 + Math.random() * 0.8; // Quỹ đạo hình nón hẹp hơn
-                pData.speedX = Math.cos(angle) * radiusSpeed;
-                pData.speedY = Math.sin(angle) * radiusSpeed;
-                pData.speedZ = 2.0 + Math.random() * 3.0;
-            } else {
-                // Tốc độ lùi về sau phụ thuộc vào tốc độ chạy của Sasuke (currentSpeed)
-                let speedMultiplier = state.baseSpeed > 0 ? (state.currentSpeed / state.baseSpeed) : 1;
-                
-                // Di chuyển đốm sáng về sau theo quỹ đạo hình nón
-                // Nhân speedMultiplier cho cả X và Y để giữ nguyên góc mở của nón dù chạy nhanh hay chậm
-                positions[i * 3] += pData.speedX * speedMultiplier * delta;
-                positions[i * 3 + 1] += pData.speedY * speedMultiplier * delta;
-                positions[i * 3 + 2] += pData.speedZ * speedMultiplier * delta;
-            }
-        }
-        chidoriParticles.geometry.attributes.position.needsUpdate = true;
+        let speedMultiplier = state.baseSpeed > 0 ? (state.currentSpeed / state.baseSpeed) : 1;
+        chidoriParticleMat.uniforms.time.value = globalSkillTime;
+        chidoriParticleMat.uniforms.speedMultiplier.value = speedMultiplier;
     }
 
     // --- CẬP NHẬT TRẠNG THÁI SUSANOO ---
@@ -819,56 +1016,11 @@ export function updateSkills(delta) {
             susanooParticles.visible = true;
             susanooSmokeParticles.visible = true;
 
-            // Cập nhật Khói Mờ (Dạng Sprite)
-            for (let i = 0; i < susanooSmokeCount; i++) {
-                let sData = susanooSmokeData[i];
-                sData.life -= delta * sData.decay;
-                sData.angleTime += delta * 2.0;
-                
-                if (sData.life <= 0) {
-                    sData.life = 1.0;
-                    sData.sprite.position.set(
-                        (Math.random() - 0.5) * 8.0, 
-                        -10.0 + Math.random() * 5.0, // Sinh ra dưới hông (so với tâm 32)
-                        (Math.random() - 0.5) * 8.0
-                    );
-                } else {
-                    sData.sprite.position.x += (sData.speedX + Math.sin(sData.angleTime) * 0.5) * delta;
-                    sData.sprite.position.y += sData.speedY * delta;
-                    sData.sprite.position.z += (sData.speedZ + Math.cos(sData.angleTime) * 0.5) * delta;
-                    
-                    sData.sprite.material.rotation += sData.rotSpeed * delta;
-                    
-                    let currentScale = sData.baseScale * (1.0 + (1.0 - sData.life) * 0.3);
-                    sData.sprite.scale.set(currentScale, currentScale, currentScale);
-                    
-                    // Fade mượt mà để khói luôn dày đặc ở giữa và tan biến ở trên đỉnh đầu
-                    let alphaFade = 0;
-                    if (sData.life > 0.8) alphaFade = (1.0 - sData.life) / 0.2; 
-                    else if (sData.life < 0.3) alphaFade = sData.life / 0.3; 
-                    else alphaFade = 1.0;
-                    
-                    sData.sprite.material.opacity = alphaFade * 0.3; // Opacity chốt ở mức 0.3 theo yêu cầu
-                }
-            }
+            // Cập nhật Khói Mờ (GPU InstancedMesh)
+            susanooSmokeMat.uniforms.time.value = globalSkillTime;
 
-            let positions = susanooParticles.geometry.attributes.position.array;
-            
-            for (let i = 0; i < susanooParticleCount; i++) {
-                let pData = susanooParticleData[i];
-                pData.life -= delta;
-                if (pData.life <= 0) {
-                    pData.life = 1.0;
-                    positions[i * 3] = (Math.random() - 0.5) * 20.0;
-                    positions[i * 3 + 1] = Math.random() * 20.0; // Giảm độ cao hồi sinh
-                    positions[i * 3 + 2] = (Math.random() - 0.5) * 20.0;
-                } else {
-                    positions[i * 3] += pData.speedX * delta;
-                    positions[i * 3 + 1] += pData.speedY * delta; // Trôi lên trên
-                    positions[i * 3 + 2] += pData.speedZ * delta;
-                }
-            }
-            susanooParticles.geometry.attributes.position.needsUpdate = true;
+            // Cập nhật Hạt Sáng (GPU Particles)
+            susanooParticleMat.uniforms.time.value = globalSkillTime;
         }
 
         // Cập nhật Sword Particles theo quỹ đạo kiếm
