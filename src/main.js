@@ -13,9 +13,9 @@ import {
 } from './character.js';
 import {
     fireballs, fireParticles, particlePool, spawnFireball, getNextParticle,
-    chidoriGroup, chidoriCore, chidoriInner,
+    chidoriGroup, chidoriCore, chidoriInner, sparksLines, coneLightningLines, coneGroup, sparksGroup,
     susanooSwordMesh, susanooSwordAuraMats, susanooInertiaOffset, susanooPreviousSwordPos, susanooMaterialsList, sparksCount, coneLightningCount,
-    chidoriCoreMat, chidoriInnerMat, coneLightningMat
+    chidoriCoreMat, chidoriInnerMat, sparkMaterial, coneLightningMat
 } from './skills.js';
 import {
     showHitbox, obsBox, fireballBox, sasukeOBB, sasukeOBB_base, toggleHitboxes
