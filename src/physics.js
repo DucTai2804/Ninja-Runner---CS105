@@ -1,7 +1,7 @@
 import { scene } from './core.js';
 import { state } from './state.js';
 import { sasuke, sasukeAnimations, sasukeAnimList, playAnimation, sasukeHitbox, susanooHitbox, susanooSwordHitbox } from './character.js';
-import { fireballs, fireParticles, getNextParticle } from './skills.js';
+import { fireballs, fireParticles, getNextParticle, fireLight } from './skills.js';
 import { obstacleRows, spawnObstaclePattern } from './obstacles.js';
 import { coinUI } from './ui.js';
 
@@ -410,7 +410,18 @@ export function updatePhysics(delta, moveDistance) {
         if (fb && fb.position.z < -100) {
             scene.remove(fb);
             fireballs.splice(i, 1);
+        } else {
+            // Cập nhật vị trí nguồn sáng đi theo hỏa cầu cuối cùng được duyệt
+            if (fireLight) {
+                fireLight.position.copy(fb.position);
+                fireLight.intensity = 15.0; // Đảm bảo đèn luôn bật khi có hỏa cầu
+            }
         }
+    }
+
+    // Tắt đèn nếu không có hỏa cầu nào
+    if (fireballs.length === 0 && fireLight) {
+        fireLight.intensity = 0.0;
     }
 
     // --- CẬP NHẬT HỆ THỐNG HẠT LỬA (PARTICLE POOL) ---

@@ -4,7 +4,7 @@ import { groundPlanes, updateTreeMatrices, treeData, treeInstancedMeshes } from 
 import { obstacleRows, spawnObstaclePattern } from './obstacles.js';
 import { TOTAL_TREES } from './config.js';
 import { sasuke, mixer, sasukeAnimations, sasukeAnimList, playAnimation, susanooModel, susanooMixer, stopSusanooAnimation, susanooLight } from './character.js';
-import { fireballs, fireParticles, chidoriGroup } from './skills.js';
+import { fireballs, fireParticles, chidoriGroup, fireLight } from './skills.js';
 import { scoreUI, coinUI, susanooBarContainer, susanooBarInner } from './ui.js';
 
 // ==========================================
@@ -52,7 +52,10 @@ export function resetGame() {
     }
 
     // Xóa hết hỏa cầu đang bay
-    fireballs.forEach(fbObj => scene.remove(fbObj.group));
+    fireballs.forEach(fbObj => {
+        if (fbObj.hasLight && fireLight) fireLight.intensity = 0.0;
+        scene.remove(fbObj.group);
+    });
     fireballs.length = 0;
 
     // Xóa hết hạt lửa bằng cách ẩn đi trả về Pool

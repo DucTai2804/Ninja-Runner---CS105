@@ -59,13 +59,9 @@ for (let i = 0; i < MAX_PARTICLES; i++) {
     particlePool.push(p);
 }
 
-// Pool đèn cho Fireball (Tránh thêm bớt PointLight lúc runtime gây khựng hình)
-export const fireballLightsPool = [];
-for (let i = 0; i < 3; i++) {
-    let l = new THREE.PointLight(0xff4500, 0.0, 40);
-    scene.add(l);
-    fireballLightsPool.push(l);
-}
+// Đèn cho Fireball (Chỉ dùng 1 đèn duy nhất cho hỏa cầu mới nhất để tiết kiệm FPS)
+export const fireLight = new THREE.PointLight(0xff4500, 0.0, 40);
+scene.add(fireLight);
 
 export function spawnFireball(sasukePos) {
     const fireballGroup = new THREE.Group();
@@ -84,8 +80,6 @@ export function spawnFireball(sasukePos) {
     fireballGroup.add(aura2);
     fireballGroup.add(aura3);
 
-    let fireLight = fireballLightsPool.find(l => l.intensity === 0);
-    if (!fireLight) fireLight = fireballLightsPool[0]; // Dự phòng
     fireLight.intensity = 15.0;
 
     if (sasukePos) {
@@ -95,7 +89,7 @@ export function spawnFireball(sasukePos) {
     }
 
     scene.add(fireballGroup);
-    fireballs.push({ group: fireballGroup, core: core, aura1: aura1, aura2: aura2, aura3: aura3, light: fireLight });
+    fireballs.push({ group: fireballGroup, core: core, aura1: aura1, aura2: aura2, aura3: aura3, hasLight: true });
 }
 
 // ==========================================
