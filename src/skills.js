@@ -63,7 +63,11 @@ for (let i = 0; i < MAX_PARTICLES; i++) {
 export const fireLight = new THREE.PointLight(0xff4500, 0.0, 40);
 scene.add(fireLight);
 
-export function spawnFireball(sasukePos) {
+export const fireballPool = [];
+export const MAX_FIREBALLS = 3;
+
+// Khởi tạo Pool Hỏa Cầu ngay từ đầu để tránh GPU cấp phát bộ nhớ khi chơi
+for (let i = 0; i < MAX_FIREBALLS; i++) {
     const fireballGroup = new THREE.Group();
     const core = new THREE.Mesh(fireballCoreGeo, fireballCoreMat);
     fireballGroup.add(core);
@@ -80,16 +84,27 @@ export function spawnFireball(sasukePos) {
     fireballGroup.add(aura2);
     fireballGroup.add(aura3);
 
+    fireballGroup.visible = false; // Ẩn đi chờ sử dụng
+    scene.add(fireballGroup);
+
+    fireballPool.push({ group: fireballGroup, core: core, aura1: aura1, aura2: aura2, aura3: aura3, hasLight: true, active: false });
+}
+
+export function spawnFireball(sasukePos) {
+    let fb = fireballPool.find(f => !f.active);
+    if (!fb) return; // Nếu đã bắn quá 3 quả cùng lúc thì bỏ qua
+
     fireLight.intensity = 15.0;
 
     if (sasukePos) {
-        fireballGroup.position.copy(sasukePos);
-        fireballGroup.position.y += 2.2;
-        fireLight.position.copy(fireballGroup.position);
+        fb.group.position.copy(sasukePos);
+        fb.group.position.y += 2.2;
+        fireLight.position.copy(fb.group.position);
     }
 
-    scene.add(fireballGroup);
-    fireballs.push({ group: fireballGroup, core: core, aura1: aura1, aura2: aura2, aura3: aura3, hasLight: true });
+    fb.active = true;
+    fb.group.visible = true;
+    fireballs.push(fb);
 }
 
 // ==========================================
@@ -1222,7 +1237,8 @@ export function updateSkills(delta) {
         b.sphereMat.opacity = b.life * 0.9;
 
         if (b.life <= 0) {
-            b.group.parent.remove(b.group);
+            b.group.visible = false;
+            b.active = false;
             activeBlasts.splice(i, 1);
         }
     }
@@ -1237,9 +1253,12 @@ export const blastOuterMatBase = new THREE.MeshBasicMaterial({ color: 0xcc00ff, 
 export const blastSphereGeo = new THREE.SphereGeometry(4, 32, 32);
 export const blastSphereMatBase = new THREE.MeshBasicMaterial({ color: 0xaa00ff, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending });
 
-export let activeBlasts = [];
-export function createFlameBlast() {
+export const blastPool = [];
+export const MAX_BLASTS = 2; // Thường chỉ có tối đa 2 vụ nổ (lúc bật và tắt Susanoo)
+
+for (let i = 0; i < MAX_BLASTS; i++) {
     let group = new THREE.Group();
+    group.visible = false;
     sasuke.add(group);
 
     let coreMat = blastCoreMatBase.clone();
@@ -1257,13 +1276,35 @@ export function createFlameBlast() {
     sphereMesh.position.y = 2;
     group.add(sphereMesh);
 
-    activeBlasts.push({
+    blastPool.push({
         group: group,
         coreMat: coreMat,
         outerMat: outerMat,
         sphereMat: sphereMat,
+        active: false,
         life: 1.0
     });
+}
+
+export let activeBlasts = [];
+export function createFlameBlast() {
+    let b = blastPool.find(bl => !bl.active);
+    if (!b) return; // Hết vụ nổ dự phòng
+
+    b.active = true;
+    b.group.visible = true;
+    b.life = 1.0;
+    
+    // Reset scale
+    b.group.scale.set(1, 1, 1);
+    b.group.position.y = 0;
+    
+    // Reset opacity
+    b.coreMat.opacity = 1.0;
+    b.outerMat.opacity = 0.8;
+    b.sphereMat.opacity = 0.9;
+
+    activeBlasts.push(b);
 }
 
 // ==========================================
@@ -1282,27 +1323,44 @@ export function precompileShaders() {
     susanooSmokeParticles.visible = true;
     if (susanooModel) susanooModel.visible = true;
 
-    // Tạo một hỏa cầu ảo để biên dịch Material của nó
-    const dummyGroup = new THREE.Group();
-    dummyGroup.add(new THREE.Mesh(fireballCoreGeo, fireballCoreMat));
-    dummyGroup.add(new THREE.Mesh(fireballAuraGeo, fireballAuraMat));
-    dummyGroup.add(new THREE.Mesh(particleGeo, particleMat));
+    // Ép bật Frustum Culling = false để Three.js chắc chắn biên dịch dù Mesh có nằm ngoài màn hình
+    const originalFrustumStates = new Map();
+    function prepareForCompile(group) {
+        group.visible = true;
+        group.traverse(child => {
+            if (child.isMesh) {
+                originalFrustumStates.set(child, child.frustumCulled);
+                child.frustumCulled = false;
+            }
+        });
+    }
 
-    // Thêm vật liệu FlameBlast vào dummy để biên dịch trước
-    dummyGroup.add(new THREE.Mesh(blastCoreGeo, blastCoreMatBase));
-    dummyGroup.add(new THREE.Mesh(blastOuterGeo, blastOuterMatBase));
-    dummyGroup.add(new THREE.Mesh(blastSphereGeo, blastSphereMatBase));
-    
-    scene.add(dummyGroup);
+    if (fireballPool.length > 0) prepareForCompile(fireballPool[0].group);
+    if (blastPool.length > 0) prepareForCompile(blastPool[0].group);
+    if (particlePool.length > 0) {
+        particlePool[0].visible = true;
+        originalFrustumStates.set(particlePool[0], particlePool[0].frustumCulled);
+        particlePool[0].frustumCulled = false;
+    }
+    prepareForCompile(chidoriGroup);
+    if (susanooModel) prepareForCompile(susanooModel);
 
     // Ép WebGLRenderer dịch toàn bộ Shaders sang mã máy GPU
     renderer.compile(scene, camera);
 
     // Trả lại trạng thái ẩn ban đầu
-    scene.remove(dummyGroup);
     chidoriGroup.visible = wasChidoriVisible;
     susanooSmokeParticles.visible = wasSmokeVisible;
     if (susanooModel) susanooModel.visible = wasSusanooVisible;
+    
+    if (fireballPool.length > 0) fireballPool[0].group.visible = false;
+    if (blastPool.length > 0) blastPool[0].group.visible = false;
+    if (particlePool.length > 0) particlePool[0].visible = false;
+
+    // Khôi phục frustumCulled
+    originalFrustumStates.forEach((wasCulled, mesh) => {
+        mesh.frustumCulled = wasCulled;
+    });
     
     console.log("Đã biên dịch xong toàn bộ Shaders!");
 }

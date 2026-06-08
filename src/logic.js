@@ -53,8 +53,8 @@ export function resetGame() {
 
     // Xóa hết hỏa cầu đang bay
     fireballs.forEach(fbObj => {
-        if (fbObj.hasLight && fireLight) fireLight.intensity = 0.0;
-        scene.remove(fbObj.group);
+        fbObj.group.visible = false;
+        fbObj.active = false;
     });
     fireballs.length = 0;
 

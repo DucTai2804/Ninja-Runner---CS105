@@ -401,14 +401,16 @@ export function updatePhysics(delta, moveDistance) {
         }
 
         if (hit) {
-            scene.remove(fb);
+            fb.visible = false;
+            fbObj.active = false;
             fireballs.splice(i, 1);
             continue;
         }
 
         // Xóa hỏa cầu nếu bay quá xa
         if (fb && fb.position.z < -100) {
-            scene.remove(fb);
+            fb.visible = false;
+            fbObj.active = false;
             fireballs.splice(i, 1);
         } else {
             // Cập nhật vị trí nguồn sáng đi theo hỏa cầu cuối cùng được duyệt
