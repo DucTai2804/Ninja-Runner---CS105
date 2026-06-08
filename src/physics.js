@@ -416,14 +416,14 @@ export function updatePhysics(delta, moveDistance) {
             // Cập nhật vị trí nguồn sáng đi theo hỏa cầu cuối cùng được duyệt
             if (fireLight) {
                 fireLight.position.copy(fb.position);
-                fireLight.intensity = 15.0; // Đảm bảo đèn luôn bật khi có hỏa cầu
+                fireLight.visible = true; // Đảm bảo đèn luôn bật khi có hỏa cầu
             }
         }
     }
 
     // Tắt đèn nếu không có hỏa cầu nào
     if (fireballs.length === 0 && fireLight) {
-        fireLight.intensity = 0.0;
+        fireLight.visible = false;
     }
 
     // --- CẬP NHẬT HỆ THỐNG HẠT LỬA (PARTICLE POOL) ---

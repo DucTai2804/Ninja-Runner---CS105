@@ -60,7 +60,8 @@ for (let i = 0; i < MAX_PARTICLES; i++) {
 }
 
 // Đèn cho Fireball (Chỉ dùng 1 đèn duy nhất cho hỏa cầu mới nhất để tiết kiệm FPS)
-export const fireLight = new THREE.PointLight(0xff4500, 0.0, 40);
+export const fireLight = new THREE.PointLight(0xff4500, 15.0, 40);
+fireLight.visible = false;
 scene.add(fireLight);
 
 export const fireballPool = [];
@@ -94,7 +95,7 @@ export function spawnFireball(sasukePos) {
     let fb = fireballPool.find(f => !f.active);
     if (!fb) return; // Nếu đã bắn quá 3 quả cùng lúc thì bỏ qua
 
-    fireLight.intensity = 15.0;
+    fireLight.visible = true;
 
     if (sasukePos) {
         fb.group.position.copy(sasukePos);
@@ -111,8 +112,9 @@ export function spawnFireball(sasukePos) {
 // KỸ NĂNG: CHIDORI (SKILL 2)
 // ==========================================
 
-// Khởi tạo đèn chớp cho Chidori (Đưa thẳng vào scene, ẩn bằng intensity 0 để không recompile)
-export const chidoriLight = new THREE.PointLight(0x66ccff, 0.0, 15.0); 
+// Khởi tạo đèn chớp cho Chidori
+export const chidoriLight = new THREE.PointLight(0x66ccff, 5.0, 15.0); 
+chidoriLight.visible = false;
 scene.add(chidoriLight);
 
 export const chidoriGroup = new THREE.Group();
@@ -997,7 +999,7 @@ export function updateSkills(delta) {
         }
         chidoriGroup.position.copy(handPos);
         chidoriGroup.visible = true;
-        chidoriLight.intensity = 5.0;
+        chidoriLight.visible = true;
         chidoriLight.position.copy(handPos); // Đèn di chuyển theo tay
         coneMesh.visible = true; // Bật sét hình nón lên CÙNG LÚC với quả cầu
 
@@ -1019,7 +1021,7 @@ export function updateSkills(delta) {
         state.chidoriFadeTimer -= delta;
         if (state.chidoriFadeTimer <= 0) {
             chidoriGroup.visible = false;
-            chidoriLight.intensity = 0.0;
+            chidoriLight.visible = false;
             coneMesh.visible = false;
         } else {
             let ratio = state.chidoriFadeTimer / 0.1;
@@ -1156,7 +1158,7 @@ export function updateSkills(delta) {
             susanooParticles.visible = false; // Tắt hạt sáng
             susanooSmokeParticles.visible = false; // Tắt khói
             swordParticles.visible = false; // Tắt vệt kiếm
-            if (susanooLight) susanooLight.intensity = 0.0;
+            if (susanooLight) susanooLight.visible = false;
             if (sasukeModel) sasukeModel.visible = true; // Hiện lại Sasuke
             stopSusanooAnimation();
             createFlameBlast(); // Bùng nổ lửa tím trắng xóa khi hết Susanoo
@@ -1352,7 +1354,25 @@ export function precompileShaders() {
     prepareForCompile(chidoriGroup);
     if (susanooModel) prepareForCompile(susanooModel);
 
-    // Ép WebGLRenderer dịch toàn bộ Shaders sang mã máy GPU
+    // Bắt đầu pre-compile cho các trường hợp số lượng đèn khác nhau (0, 1, 2, 3 đèn)
+    // Để khi vào game bật/tắt đèn sẽ lấy từ Cache ra thay vì recompile
+    if (susanooLight) susanooLight.visible = false;
+    chidoriLight.visible = false;
+    fireLight.visible = false;
+
+    // Compile biến thể 0 đèn
+    renderer.compile(scene, camera);
+
+    // Compile biến thể 1 đèn
+    fireLight.visible = true;
+    renderer.compile(scene, camera);
+
+    // Compile biến thể 2 đèn
+    chidoriLight.visible = true;
+    renderer.compile(scene, camera);
+
+    // Compile biến thể 3 đèn
+    if (susanooLight) susanooLight.visible = true;
     renderer.compile(scene, camera);
 
     // Trả lại trạng thái ẩn ban đầu
@@ -1363,6 +1383,10 @@ export function precompileShaders() {
     if (fireballPool.length > 0) fireballPool[0].group.visible = false;
     if (blastPool.length > 0) blastPool[0].group.visible = false;
     if (particlePool.length > 0) particlePool[0].visible = false;
+
+    fireLight.visible = false;
+    chidoriLight.visible = false;
+    if (susanooLight) susanooLight.visible = false;
 
     // Khôi phục frustumCulled
     originalFrustumStates.forEach((wasCulled, mesh) => {

@@ -135,7 +135,7 @@ export function setupInputs() {
         if (event.key === '3') {
             if (!state.isSusanooActive) {
                 state.isSusanooActive = true;
-                if (susanooLight) susanooLight.intensity = 8.0; // Bật sáng Susanoo
+                if (susanooLight) susanooLight.visible = true; // Bật sáng Susanoo
                 
                 // Tự động chuyển nhân vật về làn giữa
                 state.currentLane = 1;

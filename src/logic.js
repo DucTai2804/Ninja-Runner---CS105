@@ -33,7 +33,7 @@ export function resetGame() {
     state.susanooTimer = 0;
     if (susanooBarContainer) susanooBarContainer.style.display = 'none';
     if (susanooModel) susanooModel.visible = false;
-    if (susanooLight) susanooLight.intensity = 0.0;
+    if (susanooLight) susanooLight.visible = false;
     stopSusanooAnimation();
     if (window.susanooFlyAudio && window.fadeToVolume) {
         window.fadeToVolume(window.susanooFlyAudio, 0, 150, true);
@@ -56,6 +56,7 @@ export function resetGame() {
         fbObj.group.visible = false;
         fbObj.active = false;
     });
+    if (fireLight) fireLight.visible = false;
     fireballs.length = 0;
 
     // Xóa hết hạt lửa bằng cách ẩn đi trả về Pool
