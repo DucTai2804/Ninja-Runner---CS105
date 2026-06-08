@@ -349,9 +349,11 @@ export const chidoriParticleMat = new THREE.ShaderMaterial({
             
             vec3 pos = vec3(startX, startY, startZ);
             // Nhân với 1.0 (thời gian sống max)
+            // Chỉ nhân speedMultiplier vào speedZ để hạt văng ra sau nhanh hơn khi chạy nhanh, 
+            // không nhân vào X và Y để giữ nguyên góc tỏa của hình nón!
             pos.x += speedX * t * 1.0;
             pos.y += speedY * t * 1.0;
-            pos.z += speedZ * t * 1.0;
+            pos.z += speedZ * speedMultiplier * t * 1.0;
             
             vAlpha = 1.0; // CPU không có fade, giữ nguyên độ sáng
             vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
@@ -590,7 +592,7 @@ export const susanooSmokeMat = new THREE.ShaderMaterial({
 
 // QUAN TRỌNG: Phải dùng THREE.InstancedMesh thay vì THREE.Mesh để WebGL không bị crash khi vẽ InstancedBufferAttribute
 export const susanooSmokeParticles = new THREE.InstancedMesh(susanooSmokeGeo, susanooSmokeMat, susanooSmokeCount);
-susanooSmokeParticles.position.y = 15.0; // Hạ xuống mức 15.0 để khói tỏa từ vùng eo trở lên
+susanooSmokeParticles.position.y = 22.0; // Giữ lại mức 22.0 theo ý người dùng
 susanooSmokeParticles.frustumCulled = false; // Ngăn chặn tự động ẩn khi camera quay đi
 susanooSmokeParticles.visible = false;
 
@@ -953,6 +955,9 @@ export function updateSkills(delta) {
         sparksMat.uniforms.time.value = globalSkillTime;
         coneLightningMat.uniforms.time.value = globalSkillTime;
         chidoriParticleMat.uniforms.time.value = globalSkillTime;
+        
+        let speedMult = state.baseSpeed > 0 ? (state.currentSpeed / state.baseSpeed) : 1.0;
+        chidoriParticleMat.uniforms.speedMultiplier.value = speedMult;
     }
 
     if (state.isCastingChidori) {
