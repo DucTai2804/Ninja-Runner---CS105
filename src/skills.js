@@ -327,8 +327,8 @@ export const chidoriParticleMat = new THREE.ShaderMaterial({
         float hash(float n) { return fract(sin(n) * 12345.6789); }
         
         void main() {
-            // Thay vì * 2.5 (sống 0.4s), giảm xuống 1.2 (sống ~0.83s) để đốm sáng tồn tại lâu hơn
-            float rawLife = hash(seed.x) - time * 1.2;
+            // Giảm xuống 1.0 để sống trọn vẹn 1.0s
+            float rawLife = hash(seed.x) - time * 1.0;
             float cycle = floor(rawLife);
             float life = fract(rawLife); // 1.0 -> 0.0
             float t = 1.0 - life; // 0.0 -> 1.0
@@ -340,18 +340,18 @@ export const chidoriParticleMat = new THREE.ShaderMaterial({
             float startZ = -0.3;
             
             float angle = hash(localSeed + 3.0) * 6.283;
-            float radiusSpeed = 0.2 + hash(localSeed + 4.0) * 0.8;
+            // Tăng tốc độ tỏa ngang và đẩy mạnh tốc độ giật lùi (speedZ) để hạt bay xa hơn về sau
+            float radiusSpeed = 0.5 + hash(localSeed + 4.0) * 1.5;
             
             float speedX = cos(angle) * radiusSpeed;
             float speedY = sin(angle) * radiusSpeed;
-            float speedZ = 2.0 + hash(localSeed + 5.0) * 3.0;
+            float speedZ = 5.0 + hash(localSeed + 5.0) * 7.0; // Phóng ra sau cực mạnh
             
             vec3 pos = vec3(startX, startY, startZ);
-            // Nhân với 0.83 (1.0 / 1.2)
-            // Không nhân speedMultiplier vào XYZ để giữ nguyên hình nón hoàn hảo
-            pos.x += speedX * t * 0.83;
-            pos.y += speedY * t * 0.83;
-            pos.z += speedZ * t * 0.83;
+            // Nhân với 1.0 (thời gian sống max)
+            pos.x += speedX * t * 1.0;
+            pos.y += speedY * t * 1.0;
+            pos.z += speedZ * t * 1.0;
             
             vAlpha = 1.0; // CPU không có fade, giữ nguyên độ sáng
             vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
@@ -590,7 +590,7 @@ export const susanooSmokeMat = new THREE.ShaderMaterial({
 
 // QUAN TRỌNG: Phải dùng THREE.InstancedMesh thay vì THREE.Mesh để WebGL không bị crash khi vẽ InstancedBufferAttribute
 export const susanooSmokeParticles = new THREE.InstancedMesh(susanooSmokeGeo, susanooSmokeMat, susanooSmokeCount);
-susanooSmokeParticles.position.y = 22.0; // Hạ từ 32.0 xuống 22.0 để khói bao bọc xung quanh người thay vì bay thẳng lên trời
+susanooSmokeParticles.position.y = 15.0; // Hạ xuống mức 15.0 để khói tỏa từ vùng eo trở lên
 susanooSmokeParticles.frustumCulled = false; // Ngăn chặn tự động ẩn khi camera quay đi
 susanooSmokeParticles.visible = false;
 
