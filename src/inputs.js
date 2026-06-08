@@ -291,6 +291,17 @@ if (btnStartGame && startMenuUI) {
         if (window.bgmAudio) {
             window.bgmAudio.play().catch(e => console.log("Lỗi bật nhạc nền:", e));
         }
+
+        // 4. Pre-warm Audio (Ép trình duyệt giải mã âm thanh để tránh giật khi gọi play() lần đầu)
+        let audiosToWarm = [window.katonAudio, window.chidoriAudio, window.susanooSlashAudio];
+        audiosToWarm.forEach(audio => {
+            if (audio) {
+                let p = audio.play();
+                if (p !== undefined) {
+                    p.then(() => audio.pause()).catch(e => {});
+                }
+            }
+        });
     });
 }
 

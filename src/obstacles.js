@@ -497,9 +497,11 @@ gltfLoader.load('models/Dangers/true_shuriken_scale.glb', function (gltf) {
 
             // Ép compile các biến thể ánh sáng (0, 1, 2, 3 đèn) cho Phi tiêu
             // Vì khi đang tung skill, số lượng đèn sẽ thay đổi, nếu không precompile đủ các biến thể thì Phi tiêu sẽ gây giật
-            
+            const rt = new THREE.WebGLRenderTarget(1, 1);
+            renderer.setRenderTarget(rt);
+
             // 0 đèn
-            renderer.compile(scene, camera);
+            renderer.render(scene, camera);
 
             // Tạo 3 đèn ảo tạm thời để ép GPU lưu Cache
             let dummyLights = [
@@ -511,18 +513,21 @@ gltfLoader.load('models/Dangers/true_shuriken_scale.glb', function (gltf) {
 
             // 1 đèn
             dummyLights[0].visible = true;
-            renderer.compile(scene, camera);
+            renderer.render(scene, camera);
 
             // 2 đèn
             dummyLights[1].visible = true;
-            renderer.compile(scene, camera);
+            renderer.render(scene, camera);
 
             // 3 đèn
             dummyLights[2].visible = true;
-            renderer.compile(scene, camera);
+            renderer.render(scene, camera);
 
             // Xóa đèn ảo
             dummyLights.forEach(l => scene.remove(l));
+            
+            renderer.setRenderTarget(null);
+            rt.dispose();
 
             // Trả lại trạng thái
             firstShuriken.visible = wasVisible;
@@ -569,7 +574,11 @@ export function precompileObstacles(renderer, camera) {
         prepare(firstRow.coins[0].mesh);
     }
 
-    renderer.compile(scene, camera);
+    const renderTarget = new THREE.WebGLRenderTarget(1, 1);
+    renderer.setRenderTarget(renderTarget);
+    renderer.render(scene, camera);
+    renderer.setRenderTarget(null);
+    renderTarget.dispose();
 
     // Khôi phục
     forceCompileMeshes.forEach(child => {

@@ -1368,20 +1368,28 @@ export function precompileShaders() {
     chidoriLight.visible = false;
     fireLight.visible = false;
 
+    // TẠO RENDER TARGET ẢO ĐỂ ÉP UPLOAD TEXTURE/GEOMETRY LÊN GPU
+    const renderTarget = new THREE.WebGLRenderTarget(1, 1);
+    renderer.setRenderTarget(renderTarget);
+
     // Compile biến thể 0 đèn
-    renderer.compile(scene, camera);
+    renderer.render(scene, camera);
 
     // Compile biến thể 1 đèn
     fireLight.visible = true;
-    renderer.compile(scene, camera);
+    renderer.render(scene, camera);
 
     // Compile biến thể 2 đèn
     chidoriLight.visible = true;
-    renderer.compile(scene, camera);
+    renderer.render(scene, camera);
 
     // Compile biến thể 3 đèn
     if (susanooLight) susanooLight.visible = true;
-    renderer.compile(scene, camera);
+    renderer.render(scene, camera);
+
+    // Dọn dẹp
+    renderer.setRenderTarget(null);
+    renderTarget.dispose();
 
     // Trả lại trạng thái ẩn ban đầu
     chidoriGroup.visible = wasChidoriVisible;
