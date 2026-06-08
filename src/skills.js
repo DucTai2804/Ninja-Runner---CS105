@@ -327,7 +327,8 @@ export const chidoriParticleMat = new THREE.ShaderMaterial({
         float hash(float n) { return fract(sin(n) * 12345.6789); }
         
         void main() {
-            float rawLife = hash(seed.x) - time * 2.5;
+            // Thay vì * 2.5 (sống 0.4s), giảm xuống 1.2 (sống ~0.83s) để đốm sáng tồn tại lâu hơn
+            float rawLife = hash(seed.x) - time * 1.2;
             float cycle = floor(rawLife);
             float life = fract(rawLife); // 1.0 -> 0.0
             float t = 1.0 - life; // 0.0 -> 1.0
@@ -346,11 +347,11 @@ export const chidoriParticleMat = new THREE.ShaderMaterial({
             float speedZ = 2.0 + hash(localSeed + 5.0) * 3.0;
             
             vec3 pos = vec3(startX, startY, startZ);
-            // 0.4 is max lifetime (1.0 / 2.5)
+            // Nhân với 0.83 (1.0 / 1.2)
             // Không nhân speedMultiplier vào XYZ để giữ nguyên hình nón hoàn hảo
-            pos.x += speedX * t * 0.4;
-            pos.y += speedY * t * 0.4;
-            pos.z += speedZ * t * 0.4;
+            pos.x += speedX * t * 0.83;
+            pos.y += speedY * t * 0.83;
+            pos.z += speedZ * t * 0.83;
             
             vAlpha = 1.0; // CPU không có fade, giữ nguyên độ sáng
             vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
@@ -589,7 +590,7 @@ export const susanooSmokeMat = new THREE.ShaderMaterial({
 
 // QUAN TRỌNG: Phải dùng THREE.InstancedMesh thay vì THREE.Mesh để WebGL không bị crash khi vẽ InstancedBufferAttribute
 export const susanooSmokeParticles = new THREE.InstancedMesh(susanooSmokeGeo, susanooSmokeMat, susanooSmokeCount);
-susanooSmokeParticles.position.y = 32.0;
+susanooSmokeParticles.position.y = 22.0; // Hạ từ 32.0 xuống 22.0 để khói bao bọc xung quanh người thay vì bay thẳng lên trời
 susanooSmokeParticles.frustumCulled = false; // Ngăn chặn tự động ẩn khi camera quay đi
 susanooSmokeParticles.visible = false;
 
@@ -951,6 +952,7 @@ export function updateSkills(delta) {
         // GPU Lightning: Chỉ việc cập nhật biến time cho shader chạy, CPU không cần làm gì cả!
         sparksMat.uniforms.time.value = globalSkillTime;
         coneLightningMat.uniforms.time.value = globalSkillTime;
+        chidoriParticleMat.uniforms.time.value = globalSkillTime;
     }
 
     if (state.isCastingChidori) {
