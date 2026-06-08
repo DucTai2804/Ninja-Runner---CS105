@@ -1259,7 +1259,7 @@ export const MAX_BLASTS = 2; // Thường chỉ có tối đa 2 vụ nổ (lúc 
 for (let i = 0; i < MAX_BLASTS; i++) {
     let group = new THREE.Group();
     group.visible = false;
-    sasuke.add(group);
+    // Tạm thời chưa add vào sasuke ở đây để tránh lỗi vòng lặp import (ReferenceError: sasuke is not defined)
 
     let coreMat = blastCoreMatBase.clone();
     let coreMesh = new THREE.Mesh(blastCoreGeo, coreMat);
@@ -1336,6 +1336,13 @@ export function precompileShaders() {
     }
 
     if (fireballPool.length > 0) prepareForCompile(fireballPool[0].group);
+    
+    // Gắn blastPool vào sasuke lúc này mới an toàn
+    blastPool.forEach(b => {
+        if (sasuke && b.group.parent !== sasuke) {
+            sasuke.add(b.group);
+        }
+    });
     if (blastPool.length > 0) prepareForCompile(blastPool[0].group);
     if (particlePool.length > 0) {
         particlePool[0].visible = true;
