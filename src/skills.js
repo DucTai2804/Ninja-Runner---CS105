@@ -347,9 +347,10 @@ export const chidoriParticleMat = new THREE.ShaderMaterial({
             
             vec3 pos = vec3(startX, startY, startZ);
             // 0.4 is max lifetime (1.0 / 2.5)
-            pos.x += speedX * speedMultiplier * t * 0.4;
-            pos.y += speedY * speedMultiplier * t * 0.4;
-            pos.z += speedZ * speedMultiplier * t * 0.4;
+            // Không nhân speedMultiplier vào XYZ để giữ nguyên hình nón hoàn hảo
+            pos.x += speedX * t * 0.4;
+            pos.y += speedY * t * 0.4;
+            pos.z += speedZ * t * 0.4;
             
             vAlpha = 1.0; // CPU không có fade, giữ nguyên độ sáng
             vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
@@ -542,7 +543,8 @@ export const susanooSmokeMat = new THREE.ShaderMaterial({
             
             vec3 pos = instanceOffset;
             pos.x += speedX * lifeInv * 8.0;
-            pos.y += baseSpeedY * lifeInv * 8.0;
+            // Dùng (1.0 / decay) thay vì * 8.0 để chiều cao khói khớp với quỹ đạo CPU
+            pos.y += baseSpeedY * lifeInv * (1.0 / decay);
             pos.z += (speedZ + cos(angleTime) * 0.5) * lifeInv * 8.0;
             
             // Smooth alpha
@@ -932,9 +934,19 @@ export function setSusanooSwordMesh(mesh) {
 }
 
 export function updateSkills(delta) {
+    if (!sasuke) return; // Đợi model Sasuke tải xong
+
     globalSkillTime += delta;
 
-    // --- SKILL 2 (CHIDORI) ---
+    // --- CẬP NHẬT TRẠNG THÁI HỎA CẦU (Bị thiếu trong quá trình tách module) ---
+    if (state.fireballSpawnDelay > 0) {
+        state.fireballSpawnDelay -= delta;
+        if (state.fireballSpawnDelay <= 0) {
+            spawnFireball(sasuke.position);
+        }
+    }
+
+    // --- CẬP NHẬT KIẾM SUSANOO TRƯỚC TIÊN ---
     if (state.isCastingChidori || state.chidoriFadeTimer > 0) {
         // GPU Lightning: Chỉ việc cập nhật biến time cho shader chạy, CPU không cần làm gì cả!
         sparksMat.uniforms.time.value = globalSkillTime;
