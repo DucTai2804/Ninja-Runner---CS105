@@ -143,6 +143,106 @@ for (let i = 0; i < coneLightningCount; i++) {
     coneLightningLines.push(line);
 }
 
+// Tạo Texture hình cầu phát sáng (Radial Gradient)
+function createGlowingParticleTexture(r = 102, g = 238, b = 255) {
+    let canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    let context = canvas.getContext('2d');
+    let gradient = context.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+    gradient.addColorStop(0.3, `rgba(${r}, ${g}, ${b}, 0.8)`);
+    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, 64, 64);
+    return new THREE.CanvasTexture(canvas);
+}
+
+// Đốm sáng (Particles) cho Chidori
+export const chidoriParticleCount = 40;
+export const chidoriParticleGeo = new THREE.BufferGeometry();
+export const chidoriParticlePositions = new Float32Array(chidoriParticleCount * 3);
+export const chidoriParticleData = [];
+for (let i = 0; i < chidoriParticleCount; i++) {
+    chidoriParticlePositions[i * 3] = 0;
+    chidoriParticlePositions[i * 3 + 1] = 0;
+    chidoriParticlePositions[i * 3 + 2] = 0;
+    let angle = Math.random() * Math.PI * 2;
+    let radiusSpeed = 0.2 + Math.random() * 0.8; // Tốc độ mở rộng ngang (bằng một nửa tia sét lớn)
+    
+    chidoriParticleData.push({
+        life: Math.random(),
+        speedX: Math.cos(angle) * radiusSpeed,
+        speedY: Math.sin(angle) * radiusSpeed,
+        speedZ: 2.0 + Math.random() * 3.0 // Tốc độ lùi về sau
+    });
+}
+chidoriParticleGeo.setAttribute('position', new THREE.BufferAttribute(chidoriParticlePositions, 3));
+export const chidoriParticleMat = new THREE.PointsMaterial({
+    color: 0xffffff, // Màu được quy định trong texture rồi
+    size: 0.35, // Tăng kích thước đốm để dễ thấy hơn
+    map: createGlowingParticleTexture(),
+    transparent: true,
+    opacity: 1.0,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false
+});
+export const chidoriParticles = new THREE.Points(chidoriParticleGeo, chidoriParticleMat);
+chidoriGroup.add(chidoriParticles);
+
+// Đốm sáng (Particles) cho Susanoo
+export const susanooParticleCount = 80;
+export const susanooParticleGeo = new THREE.BufferGeometry();
+export const susanooParticlePositions = new Float32Array(susanooParticleCount * 3);
+export const susanooParticleData = [];
+for (let i = 0; i < susanooParticleCount; i++) {
+    susanooParticlePositions[i * 3] = (Math.random() - 0.5) * 20.0;
+    susanooParticlePositions[i * 3 + 1] = Math.random() * 20.0; // Giảm độ cao khởi tạo để không bay quá cao
+    susanooParticlePositions[i * 3 + 2] = (Math.random() - 0.5) * 20.0;
+    
+    susanooParticleData.push({
+        life: Math.random(),
+        speedX: (Math.random() - 0.5) * 1.5,
+        speedY: 10.0 + Math.random() * 10.0, // Tăng tốc độ chảy lên trên cực mạnh (10 đến 20 m/s)
+        speedZ: (Math.random() - 0.5) * 1.5
+    });
+}
+susanooParticleGeo.setAttribute('position', new THREE.BufferAttribute(susanooParticlePositions, 3));
+export const susanooParticleMat = new THREE.PointsMaterial({
+    color: 0xffffff, // Để nguyên màu trắng để kết cấu tự phát sáng màu tím
+    size: 0.6, // Trả lại kích thước như cũ
+    map: createGlowingParticleTexture(255, 119, 255), // Sắc tím sáng rực rỡ của lõi kiếm (0xFF77FF)
+    transparent: true,
+    opacity: 0.8,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false
+});
+export const susanooParticles = new THREE.Points(susanooParticleGeo, susanooParticleMat);
+susanooParticles.position.y = 10.0; // Dời lên trên cho khớp với trọng tâm của Susanoo
+susanooParticles.visible = false;
+
+// Đốm sáng (Particles) cho kiếm Susanoo chuyển động theo quán tính
+export const swordParticleCount = 100;
+export const swordParticleGeo = new THREE.BufferGeometry();
+export const swordParticlePositions = new Float32Array(swordParticleCount * 3);
+export const swordParticleData = [];
+for (let i = 0; i < swordParticleCount; i++) {
+    swordParticlePositions[i * 3] = 9999;
+    swordParticlePositions[i * 3 + 1] = 9999;
+    swordParticlePositions[i * 3 + 2] = 9999;
+    
+    swordParticleData.push({
+        life: 0,
+        speedX: 0,
+        speedY: 0,
+        speedZ: 0
+    });
+}
+swordParticleGeo.setAttribute('position', new THREE.BufferAttribute(swordParticlePositions, 3));
+export const swordParticles = new THREE.Points(swordParticleGeo, susanooParticleMat); // Dùng lại vầng hào quang tím
+swordParticles.frustumCulled = false; // QUAN TRỌNG: Ngăn Three.js culling vì bounding sphere ban đầu ở 9999
+swordParticles.visible = false;
+
 // ==========================================
 // KỸ NĂNG: SUSANOO (SKILL 3) VÀ QUÁN TÍNH
 // ==========================================
@@ -558,6 +658,7 @@ export function updateSkills(delta) {
         chidoriInnerMat.opacity = 1.0;
         sparkMaterial.opacity = 0.9;
         coneLightningMat.opacity = 0.8;
+        chidoriParticleMat.opacity = 1.0;
         for (let i = 0; i < sparksLines.length; i++) sparksLines[i].geometry.setDrawRange(0, 4);
         for (let i = 0; i < coneLightningLines.length; i++) coneLightningLines[i].geometry.setDrawRange(0, 5);
 
@@ -584,12 +685,46 @@ export function updateSkills(delta) {
             for (let i = 0; i < sparksLines.length; i++) {
                 sparksLines[i].geometry.setDrawRange(0, sparkPointsToDraw);
             }
-
+            
             let conePointsToDraw = Math.max(1, Math.ceil(ratio * 5));
             for (let i = 0; i < coneLightningLines.length; i++) {
                 coneLightningLines[i].geometry.setDrawRange(0, conePointsToDraw);
             }
+            chidoriParticleMat.opacity = 0.8 * ratio;
         }
+    }
+
+    // Cập nhật các đốm sáng bay về phía sau (cập nhật liên tục khi đang cast hoặc đang fade)
+    if (state.isCastingChidori || state.chidoriFadeTimer > 0) {
+        let positions = chidoriParticles.geometry.attributes.position.array;
+        for (let i = 0; i < chidoriParticleCount; i++) {
+            let pData = chidoriParticleData[i];
+            pData.life -= delta * 2.5; // Tăng tốc độ lão hóa để đốm sáng biến mất ngang với điểm cuối tia sét
+            if (pData.life <= 0) {
+                pData.life = 1.0;
+                // Hồi sinh đốm sáng ở trung tâm quả cầu (tay Sasuke)
+                positions[i * 3] = (Math.random() - 0.5) * 0.4;
+                positions[i * 3 + 1] = (Math.random() - 0.5) * 0.4;
+                positions[i * 3 + 2] = -0.3; // Bắt đầu dịch ra trước tay một chút giống các tia sét
+                
+                // Gán lại quỹ đạo hình nón mới
+                let angle = Math.random() * Math.PI * 2;
+                let radiusSpeed = 0.2 + Math.random() * 0.8; // Quỹ đạo hình nón hẹp hơn
+                pData.speedX = Math.cos(angle) * radiusSpeed;
+                pData.speedY = Math.sin(angle) * radiusSpeed;
+                pData.speedZ = 2.0 + Math.random() * 3.0;
+            } else {
+                // Tốc độ lùi về sau phụ thuộc vào tốc độ chạy của Sasuke (currentSpeed)
+                let speedMultiplier = state.baseSpeed > 0 ? (state.currentSpeed / state.baseSpeed) : 1;
+                
+                // Di chuyển đốm sáng về sau theo quỹ đạo hình nón
+                // Nhân speedMultiplier cho cả X và Y để giữ nguyên góc mở của nón dù chạy nhanh hay chậm
+                positions[i * 3] += pData.speedX * speedMultiplier * delta;
+                positions[i * 3 + 1] += pData.speedY * speedMultiplier * delta;
+                positions[i * 3 + 2] += pData.speedZ * speedMultiplier * delta;
+            }
+        }
+        chidoriParticles.geometry.attributes.position.needsUpdate = true;
     }
 
     // --- CẬP NHẬT TRẠNG THÁI SUSANOO ---
@@ -616,6 +751,78 @@ export function updateSkills(delta) {
     if (state.isSusanooActive) {
         state.susanooTimer -= delta;
 
+        // Cập nhật Susanoo Particles
+        if (susanooParticles) {
+            susanooParticles.visible = true;
+            let positions = susanooParticles.geometry.attributes.position.array;
+            for (let i = 0; i < susanooParticleCount; i++) {
+                let pData = susanooParticleData[i];
+                pData.life -= delta * 1.5; // Tăng tốc độ lão hóa để hạt biến mất nhanh hơn
+                if (pData.life <= 0) {
+                    pData.life = 1.0;
+                    positions[i * 3] = (Math.random() - 0.5) * 20.0;
+                    positions[i * 3 + 1] = Math.random() * 20.0; // Giảm độ cao hồi sinh
+                    positions[i * 3 + 2] = (Math.random() - 0.5) * 20.0;
+                } else {
+                    positions[i * 3] += pData.speedX * delta;
+                    positions[i * 3 + 1] += pData.speedY * delta; // Trôi lên trên
+                    positions[i * 3 + 2] += pData.speedZ * delta;
+                }
+            }
+            susanooParticles.geometry.attributes.position.needsUpdate = true;
+        }
+
+        // Cập nhật Sword Particles theo quỹ đạo kiếm
+        if (swordParticles && susanooSwordHitbox) {
+            swordParticles.visible = true;
+            let positions = swordParticles.geometry.attributes.position.array;
+            let spawnedThisFrame = 0;
+            
+            // Tính toán kích thước của lưỡi kiếm
+            susanooSwordHitbox.geometry.computeBoundingBox();
+            let size = new THREE.Vector3();
+            let center = new THREE.Vector3();
+            susanooSwordHitbox.geometry.boundingBox.getSize(size);
+            susanooSwordHitbox.geometry.boundingBox.getCenter(center);
+            
+            for (let i = 0; i < swordParticleCount; i++) {
+                let pData = swordParticleData[i];
+                if (pData.life > 0) {
+                    pData.life -= delta * 3.0; // Biến mất khá nhanh (1/3 giây) để tạo vệt chém
+                    positions[i * 3] += pData.speedX * delta;
+                    positions[i * 3 + 1] += pData.speedY * delta;
+                    positions[i * 3 + 2] += pData.speedZ * delta;
+                } else {
+                    positions[i * 3] = 9999; // Giấu đi
+                    
+                    // Nếu đang chém thì rải đốm sáng dọc theo kiếm
+                    if (state.isSusanooSlashing && spawnedThisFrame < 6) { // Sinh ra 6 hạt mỗi frame
+                        pData.life = 1.0;
+                        
+                        let localPt = new THREE.Vector3(
+                            center.x + (Math.random() - 0.5) * size.x * 2.0,
+                            center.y + (Math.random() - 0.5) * size.y * 1.5, // Dọc theo lưỡi kiếm
+                            center.z + (Math.random() - 0.5) * size.z * 2.0
+                        );
+                        
+                        susanooSwordHitbox.localToWorld(localPt); // Chuyển ra world space để đốm sáng nằm lại trên không trung
+                        
+                        positions[i * 3] = localPt.x;
+                        positions[i * 3 + 1] = localPt.y;
+                        positions[i * 3 + 2] = localPt.z;
+                        
+                        // Quán tính lơ lửng sau khi chém
+                        pData.speedX = (Math.random() - 0.5) * 5.0;
+                        pData.speedY = (Math.random() - 0.5) * 5.0;
+                        pData.speedZ = (Math.random() - 0.5) * 5.0;
+                        
+                        spawnedThisFrame++;
+                    }
+                }
+            }
+            swordParticles.geometry.attributes.position.needsUpdate = true;
+        }
+
         // Cập nhật thanh thời gian UI
         let susanooBarInner = document.getElementById('susanooBarInner');
         if (susanooBarInner) {
@@ -641,6 +848,8 @@ export function updateSkills(delta) {
             if (susanooBarContainer) susanooBarContainer.style.display = 'none';
             state.currentSpeed = state.baseSpeed; // Trả lại tốc độ bình thường
             if (susanooModel) susanooModel.visible = false;
+            susanooParticles.visible = false; // Tắt hạt sáng
+            swordParticles.visible = false; // Tắt vệt kiếm
             if (sasukeModel) sasukeModel.visible = true; // Hiện lại Sasuke
             stopSusanooAnimation();
             import('./main.js').then(m => m.createFlameBlast()); // Bùng nổ lửa tím trắng xóa khi hết Susanoo
