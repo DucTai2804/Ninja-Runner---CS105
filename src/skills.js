@@ -327,19 +327,23 @@ export const chidoriParticleMat = new THREE.ShaderMaterial({
         float hash(float n) { return fract(sin(n) * 12345.6789); }
         
         void main() {
-            float life = fract(hash(seed.x) - time * 2.5); // 1.0 -> 0.0
+            float rawLife = hash(seed.x) - time * 2.5;
+            float cycle = floor(rawLife);
+            float life = fract(rawLife); // 1.0 -> 0.0
             float t = 1.0 - life; // 0.0 -> 1.0
             
-            float startX = (hash(seed.y) - 0.5) * 0.4;
-            float startY = (hash(seed.z) - 0.5) * 0.4;
+            float localSeed = seed.x + cycle * 123.45;
+            
+            float startX = (hash(localSeed + 1.0) - 0.5) * 0.4;
+            float startY = (hash(localSeed + 2.0) - 0.5) * 0.4;
             float startZ = -0.3;
             
-            float angle = hash(seed.x * 2.0) * 6.283;
-            float radiusSpeed = 0.2 + hash(seed.y * 2.0) * 0.8;
+            float angle = hash(localSeed + 3.0) * 6.283;
+            float radiusSpeed = 0.2 + hash(localSeed + 4.0) * 0.8;
             
             float speedX = cos(angle) * radiusSpeed;
             float speedY = sin(angle) * radiusSpeed;
-            float speedZ = 2.0 + hash(seed.z * 2.0) * 3.0;
+            float speedZ = 2.0 + hash(localSeed + 5.0) * 3.0;
             
             vec3 pos = vec3(startX, startY, startZ);
             // 0.4 is max lifetime (1.0 / 2.5)
@@ -398,16 +402,20 @@ export const susanooParticleMat = new THREE.ShaderMaterial({
         varying float vAlpha;
         float hash(float n) { return fract(sin(n) * 12345.6789); }
         void main() {
-            float life = fract(hash(seed.x) - time * 1.0); // 1.0 -> 0.0
+            float rawLife = hash(seed.x) - time * 1.0;
+            float cycle = floor(rawLife);
+            float life = fract(rawLife); // 1.0 -> 0.0
             float t = 1.0 - life;
             
-            float startX = (hash(seed.y) - 0.5) * 20.0;
-            float startY = hash(seed.z) * 20.0;
-            float startZ = (hash(seed.x * 2.0) - 0.5) * 20.0;
+            float localSeed = seed.x + cycle * 123.45;
             
-            float speedX = (hash(seed.y * 2.0) - 0.5) * 1.5;
-            float speedY = 10.0 + hash(seed.z * 2.0) * 10.0;
-            float speedZ = (hash(seed.x * 3.0) - 0.5) * 1.5;
+            float startX = (hash(localSeed + 1.0) - 0.5) * 20.0;
+            float startY = hash(localSeed + 2.0) * 20.0;
+            float startZ = (hash(localSeed + 3.0) - 0.5) * 20.0;
+            
+            float speedX = (hash(localSeed + 4.0) - 0.5) * 1.5;
+            float speedY = 10.0 + hash(localSeed + 5.0) * 10.0;
+            float speedZ = (hash(localSeed + 6.0) - 0.5) * 1.5;
             
             vec3 pos = vec3(startX, startY, startZ);
             pos.x += speedX * t; // duration is 1.0s
@@ -520,12 +528,16 @@ export const susanooSmokeMat = new THREE.ShaderMaterial({
             
             // Calculate looping life: 1.0 -> 0.0
             float decay = 0.4 + hash(seed) * 0.4;
-            float life = fract(hash(seed + 10.0) - time * decay);
+            float rawLife = hash(seed + 10.0) - time * decay;
+            float cycle = floor(rawLife);
+            float life = fract(rawLife);
             float lifeInv = 1.0 - life;
             
+            float localSeed = seed + cycle * 123.45;
+            
             // Movement
-            float speedX = (hash(seed + 1.0) - 0.5) * 1.5;
-            float speedZ = (hash(seed + 2.0) - 0.5) * 1.5;
+            float speedX = (hash(localSeed + 1.0) - 0.5) * 1.5;
+            float speedZ = (hash(localSeed + 2.0) - 0.5) * 1.5;
             float angleTime = hash(seed + 3.0) * 6.28 + time * 2.0;
             
             vec3 pos = instanceOffset;
