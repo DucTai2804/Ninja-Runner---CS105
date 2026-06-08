@@ -1347,12 +1347,20 @@ export function precompileShaders() {
     });
     if (blastPool.length > 0) prepareForCompile(blastPool[0].group);
     if (particlePool.length > 0) {
-        particlePool[0].visible = true;
-        originalFrustumStates.set(particlePool[0], particlePool[0].frustumCulled);
-        particlePool[0].frustumCulled = false;
+        particlePool.forEach(p => {
+            p.visible = true;
+            originalFrustumStates.set(p, p.frustumCulled);
+            p.frustumCulled = false;
+        });
     }
+    
     prepareForCompile(chidoriGroup);
     if (susanooModel) prepareForCompile(susanooModel);
+    
+    // Nạp thêm các hệ thống hạt bị thiếu vào quy trình ép biên dịch
+    if (susanooParticles) prepareForCompile(susanooParticles);
+    if (susanooSmokeParticles) prepareForCompile(susanooSmokeParticles);
+    if (swordParticles) prepareForCompile(swordParticles);
 
     // Bắt đầu pre-compile cho các trường hợp số lượng đèn khác nhau (0, 1, 2, 3 đèn)
     // Để khi vào game bật/tắt đèn sẽ lấy từ Cache ra thay vì recompile
@@ -1377,12 +1385,14 @@ export function precompileShaders() {
 
     // Trả lại trạng thái ẩn ban đầu
     chidoriGroup.visible = wasChidoriVisible;
-    susanooSmokeParticles.visible = wasSmokeVisible;
+    if (susanooSmokeParticles) susanooSmokeParticles.visible = wasSmokeVisible;
+    if (susanooParticles) susanooParticles.visible = false;
+    if (swordParticles) swordParticles.visible = false;
     if (susanooModel) susanooModel.visible = wasSusanooVisible;
     
-    if (fireballPool.length > 0) fireballPool[0].group.visible = false;
-    if (blastPool.length > 0) blastPool[0].group.visible = false;
-    if (particlePool.length > 0) particlePool[0].visible = false;
+    if (fireballPool.length > 0) fireballPool.forEach(fb => fb.group.visible = false);
+    if (blastPool.length > 0) blastPool.forEach(b => b.group.visible = false);
+    if (particlePool.length > 0) particlePool.forEach(p => p.visible = false);
 
     fireLight.visible = false;
     chidoriLight.visible = false;

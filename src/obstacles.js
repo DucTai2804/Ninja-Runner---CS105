@@ -1,4 +1,4 @@
-import { scene } from './core.js';
+import { scene, renderer, camera } from './core.js';
 import { CONFIG, LANE_POSITIONS } from './config.js';
 import { mountainTex, giantRockTex, treeTex, gltfLoader } from './assets.js';
 import { hash } from './utils.js';
@@ -472,6 +472,66 @@ gltfLoader.load('models/Dangers/true_shuriken_scale.glb', function (gltf) {
             obs.shuriken = clone;
         });
     });
+
+    console.log("Đã trang bị xong hệ thống Phi tiêu Tử thần!");
+
+    // ==========================================
+    // KHẮC PHỤC STUTTER CHO SHURIKEN:
+    // Vì Shuriken load bất đồng bộ (sau khi game có thể đã bắt đầu)
+    // Cần ép GPU dịch Shader của nó ngay lập tức sau khi load xong!
+    // ==========================================
+    if (obstacleRows.length > 0 && obstacleRows[0].obstacles.length > 0) {
+        let firstShuriken = obstacleRows[0].obstacles[0].shuriken;
+        if (firstShuriken) {
+            let wasVisible = firstShuriken.visible;
+            firstShuriken.visible = true;
+            
+            let forceCompileMeshes = [];
+            firstShuriken.traverse(child => {
+                if (child.isMesh) {
+                    child.userData.wasCulled = child.frustumCulled;
+                    child.frustumCulled = false;
+                    forceCompileMeshes.push(child);
+                }
+            });
+
+            // Ép compile các biến thể ánh sáng (0, 1, 2, 3 đèn) cho Phi tiêu
+            // Vì khi đang tung skill, số lượng đèn sẽ thay đổi, nếu không precompile đủ các biến thể thì Phi tiêu sẽ gây giật
+            
+            // 0 đèn
+            renderer.compile(scene, camera);
+
+            // Tạo 3 đèn ảo tạm thời để ép GPU lưu Cache
+            let dummyLights = [
+                new THREE.PointLight(0xffffff, 1, 10),
+                new THREE.PointLight(0xffffff, 1, 10),
+                new THREE.PointLight(0xffffff, 1, 10)
+            ];
+            dummyLights.forEach(l => scene.add(l));
+
+            // 1 đèn
+            dummyLights[0].visible = true;
+            renderer.compile(scene, camera);
+
+            // 2 đèn
+            dummyLights[1].visible = true;
+            renderer.compile(scene, camera);
+
+            // 3 đèn
+            dummyLights[2].visible = true;
+            renderer.compile(scene, camera);
+
+            // Xóa đèn ảo
+            dummyLights.forEach(l => scene.remove(l));
+
+            // Trả lại trạng thái
+            firstShuriken.visible = wasVisible;
+            forceCompileMeshes.forEach(child => {
+                child.frustumCulled = child.userData.wasCulled;
+            });
+            console.log("Đã Cache xong Shader của Phi tiêu!");
+        }
+    }
     console.log("Đã trang bị xong hệ thống Phi tiêu Tử thần!");
 });
 
