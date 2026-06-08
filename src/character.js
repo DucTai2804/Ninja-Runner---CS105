@@ -11,7 +11,8 @@ import {
     susanooFireAuraMaterial,
     setupSusanooSwordBlade,
     susanooParticles,
-    swordParticles
+    swordParticles,
+    susanooSmokeParticles
 } from './skills.js';
 import { state } from './state.js';
 
@@ -23,6 +24,7 @@ scene.add(sasuke);
 scene.add(swordParticles); // Thêm vệt kiếm vào scene vì chúng di chuyển trong không gian thế giới
 sasuke.add(chidoriGroup);
 sasuke.add(susanooParticles);
+sasuke.add(susanooSmokeParticles); // Làn khói tím ở dưới chân Susanoo
 
 export const sasukeHitboxGeo = new THREE.BoxGeometry(1.0, 1.8, 1.0);
 export const sasukeHitboxMat = new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true });

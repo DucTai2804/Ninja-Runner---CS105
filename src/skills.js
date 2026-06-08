@@ -158,6 +158,23 @@ function createGlowingParticleTexture(r = 102, g = 238, b = 255) {
     return new THREE.CanvasTexture(canvas);
 }
 
+// Tạo Texture dạng Khói (Mềm, mờ hơn)
+function createSmokeTexture(r = 255, g = 255, b = 255) {
+    let canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 128;
+    let context = canvas.getContext('2d');
+    let gradient = context.createRadialGradient(64, 64, 0, 64, 64, 64);
+    // Khói cần to dần và rất mờ ở viền để khi đè lên nhau không bị lộ hình tròn
+    gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.8)`);
+    gradient.addColorStop(0.3, `rgba(${r}, ${g}, ${b}, 0.5)`);
+    gradient.addColorStop(0.7, `rgba(${r}, ${g}, ${b}, 0.1)`);
+    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, 128, 128);
+    return new THREE.CanvasTexture(canvas);
+}
+
 // Đốm sáng (Particles) cho Chidori
 export const chidoriParticleCount = 40;
 export const chidoriParticleGeo = new THREE.BufferGeometry();
@@ -242,6 +259,52 @@ swordParticleGeo.setAttribute('position', new THREE.BufferAttribute(swordParticl
 export const swordParticles = new THREE.Points(swordParticleGeo, susanooParticleMat); // Dùng lại vầng hào quang tím
 swordParticles.frustumCulled = false; // QUAN TRỌNG: Ngăn Three.js culling vì bounding sphere ban đầu ở 9999
 swordParticles.visible = false;
+
+// Khói ảo ảnh (Smoke) quanh chân và người Susanoo
+export const susanooSmokeCount = 25; // Giảm số lượng xuống 25 để tránh tụt FPS (Fill rate trên GPU)
+export const susanooSmokeParticles = new THREE.Group(); 
+susanooSmokeParticles.position.y = 32.0; 
+susanooSmokeParticles.visible = false;
+
+export const susanooSmokeData = [];
+const smokeMat = new THREE.SpriteMaterial({
+    map: createSmokeTexture(255, 255, 255),
+    color: 0x5a0099, // Màu tím đậm đà, không quá đen để tránh bị bẩn, cũng không quá trắng để bị chói
+    transparent: true,
+    opacity: 0.3, // Tăng opacity gốc lên 0.3
+    depthWrite: false,
+    blending: THREE.AdditiveBlending 
+});
+
+for (let i = 0; i < susanooSmokeCount; i++) {
+    let sprite = new THREE.Sprite(smokeMat.clone()); // Cần clone để điều khiển opacity từng hạt
+    
+    let size = 6.0 + Math.random() * 8.0; // Khói ôm sát, nhỏ gọn hơn (6m - 14m)
+    sprite.scale.set(size, size, size);
+    
+    sprite.position.set(
+        (Math.random() - 0.5) * 8.0, // X cực kỳ ôm sát thân (rộng 8m)
+        (Math.random() - 0.5) * 16.0, // Y trải từ eo đến đầu (-8m đến 8m so với tâm Y=18)
+        (Math.random() - 0.5) * 8.0  // Z cực kỳ ôm sát thân
+    );
+    
+    // Xoay khói ngẫu nhiên
+    sprite.material.rotation = Math.random() * Math.PI * 2;
+    
+    susanooSmokeParticles.add(sprite);
+    
+    susanooSmokeData.push({
+        sprite: sprite,
+        baseScale: size,
+        life: Math.random(),
+        speedY: 4.0 + Math.random() * 5.0, // Bay lên nhanh hơn để tạo hiệu ứng luồng khí
+        speedX: (Math.random() - 0.5) * 1.5,
+        speedZ: (Math.random() - 0.5) * 1.5,
+        rotSpeed: (Math.random() - 0.5) * 2.0, // Xoay rõ rệt hơn
+        decay: 0.4 + Math.random() * 0.4,
+        angleTime: Math.random() * Math.PI * 2 // Dùng để tạo lượn sóng
+    });
+}
 
 // ==========================================
 // KỸ NĂNG: SUSANOO (SKILL 3) VÀ QUÁN TÍNH
@@ -751,13 +814,49 @@ export function updateSkills(delta) {
     if (state.isSusanooActive) {
         state.susanooTimer -= delta;
 
-        // Cập nhật Susanoo Particles
-        if (susanooParticles) {
+        // Cập nhật Hạt Sáng Susanoo và Làn Khói
+        if (susanooParticles && susanooSmokeParticles) {
             susanooParticles.visible = true;
+            susanooSmokeParticles.visible = true;
+
+            // Cập nhật Khói Mờ (Dạng Sprite)
+            for (let i = 0; i < susanooSmokeCount; i++) {
+                let sData = susanooSmokeData[i];
+                sData.life -= delta * sData.decay;
+                sData.angleTime += delta * 2.0;
+                
+                if (sData.life <= 0) {
+                    sData.life = 1.0;
+                    sData.sprite.position.set(
+                        (Math.random() - 0.5) * 8.0, 
+                        -10.0 + Math.random() * 5.0, // Sinh ra dưới hông (so với tâm 32)
+                        (Math.random() - 0.5) * 8.0
+                    );
+                } else {
+                    sData.sprite.position.x += (sData.speedX + Math.sin(sData.angleTime) * 0.5) * delta;
+                    sData.sprite.position.y += sData.speedY * delta;
+                    sData.sprite.position.z += (sData.speedZ + Math.cos(sData.angleTime) * 0.5) * delta;
+                    
+                    sData.sprite.material.rotation += sData.rotSpeed * delta;
+                    
+                    let currentScale = sData.baseScale * (1.0 + (1.0 - sData.life) * 0.3);
+                    sData.sprite.scale.set(currentScale, currentScale, currentScale);
+                    
+                    // Fade mượt mà để khói luôn dày đặc ở giữa và tan biến ở trên đỉnh đầu
+                    let alphaFade = 0;
+                    if (sData.life > 0.8) alphaFade = (1.0 - sData.life) / 0.2; 
+                    else if (sData.life < 0.3) alphaFade = sData.life / 0.3; 
+                    else alphaFade = 1.0;
+                    
+                    sData.sprite.material.opacity = alphaFade * 0.3; // Opacity chốt ở mức 0.3 theo yêu cầu
+                }
+            }
+
             let positions = susanooParticles.geometry.attributes.position.array;
+            
             for (let i = 0; i < susanooParticleCount; i++) {
                 let pData = susanooParticleData[i];
-                pData.life -= delta * 1.5; // Tăng tốc độ lão hóa để hạt biến mất nhanh hơn
+                pData.life -= delta;
                 if (pData.life <= 0) {
                     pData.life = 1.0;
                     positions[i * 3] = (Math.random() - 0.5) * 20.0;
@@ -849,6 +948,7 @@ export function updateSkills(delta) {
             state.currentSpeed = state.baseSpeed; // Trả lại tốc độ bình thường
             if (susanooModel) susanooModel.visible = false;
             susanooParticles.visible = false; // Tắt hạt sáng
+            susanooSmokeParticles.visible = false; // Tắt khói
             swordParticles.visible = false; // Tắt vệt kiếm
             if (sasukeModel) sasukeModel.visible = true; // Hiện lại Sasuke
             stopSusanooAnimation();

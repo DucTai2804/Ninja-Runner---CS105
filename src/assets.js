@@ -84,7 +84,12 @@ export const susanooFlyAudio = {
     source: null,
     gainNode: null,
     isPlaying: false,
+    fadeTimeout: null,
     play: function() {
+        if (this.fadeTimeout) {
+            clearTimeout(this.fadeTimeout);
+            this.fadeTimeout = null;
+        }
         if (!susanooFlyBuffer || this.isPlaying) return;
         if (window.audioCtx.state === 'suspended') window.audioCtx.resume();
         
@@ -102,6 +107,10 @@ export const susanooFlyAudio = {
         this.isPlaying = true;
     },
     stop: function() {
+        if (this.fadeTimeout) {
+            clearTimeout(this.fadeTimeout);
+            this.fadeTimeout = null;
+        }
         if (this.source && this.isPlaying) {
             this.source.stop();
             this.source.disconnect();
@@ -111,6 +120,10 @@ export const susanooFlyAudio = {
     },
     fadeTo: function(targetVol, durationMs, pauseAfter = false) {
         if (!this.gainNode) return;
+        if (this.fadeTimeout) {
+            clearTimeout(this.fadeTimeout);
+            this.fadeTimeout = null;
+        }
         let now = window.audioCtx.currentTime;
         let durationSec = durationMs / 1000;
         this.gainNode.gain.cancelScheduledValues(now);
@@ -118,7 +131,7 @@ export const susanooFlyAudio = {
         this.gainNode.gain.linearRampToValueAtTime(targetVol, now + durationSec);
         
         if (pauseAfter && targetVol === 0) {
-            setTimeout(() => {
+            this.fadeTimeout = setTimeout(() => {
                 this.stop();
             }, durationMs + 50);
         }
