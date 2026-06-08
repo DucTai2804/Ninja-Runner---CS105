@@ -1229,9 +1229,9 @@ export function updateSkills(delta) {
         let b = activeBlasts[i];
         b.life -= delta * 2.5; // Tốc độ biến mất
 
-        b.group.scale.x += delta * 12;
-        b.group.scale.z += delta * 12;
-        b.group.scale.y += delta * 15;
+        b.group.scale.x += delta * 4;
+        b.group.scale.z += delta * 4;
+        b.group.scale.y += delta * 5;
         b.group.position.y += delta * 5;
 
         b.coreMat.opacity = b.life;
@@ -1246,13 +1246,13 @@ export function updateSkills(delta) {
     }
 }
 
-export const blastCoreGeo = new THREE.CylinderGeometry(0.1, 4, 15, 32, 1, true);
+export const blastCoreGeo = new THREE.CylinderGeometry(0.1, 2, 10, 16, 1, true);
 export const blastCoreMatBase = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1.0, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
 
-export const blastOuterGeo = new THREE.CylinderGeometry(1, 8, 20, 32, 1, true);
+export const blastOuterGeo = new THREE.CylinderGeometry(0.5, 4, 15, 16, 1, true);
 export const blastOuterMatBase = new THREE.MeshBasicMaterial({ color: 0xcc00ff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
 
-export const blastSphereGeo = new THREE.SphereGeometry(4, 32, 32);
+export const blastSphereGeo = new THREE.SphereGeometry(2, 16, 16);
 export const blastSphereMatBase = new THREE.MeshBasicMaterial({ color: 0xaa00ff, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending });
 
 export const blastPool = [];
