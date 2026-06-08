@@ -311,4 +311,11 @@ gltfLoader.load('models/Characters/sasuke/susanoo_animation_clean.glb', function
         let idleAnim = Object.keys(susanooAnimations).find(k => k.includes('idle')) || Object.keys(susanooAnimations)[0];
         if (idleAnim) playSusanooAnimation(idleAnim, true);
     }
+    
+    // Đảm bảo biên dịch shaders của Susanoo ngay khi tải xong (nếu game đã Start hoặc chuẩn bị Start)
+    import('./skills.js').then(module => {
+        if (module.precompileShaders) {
+            module.precompileShaders();
+        }
+    });
 });

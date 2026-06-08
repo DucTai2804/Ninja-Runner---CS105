@@ -267,10 +267,15 @@ export function setupInputs() {
 state.isPaused = true;
 
 // Xử lý nút Bắt Đầu Game (Start Menu)
+import { precompileShaders } from './skills.js';
+
 const startMenuUI = document.getElementById('startMenuUI');
 const btnStartGame = document.getElementById('btnStartGame');
 if (btnStartGame && startMenuUI) {
     btnStartGame.addEventListener('click', () => {
+        // 0. Precompile shaders trước khi vào game để tránh giật lag lần đầu tung chiêu
+        precompileShaders();
+
         // 1. Ẩn màn hình Menu
         startMenuUI.style.display = 'none';
         

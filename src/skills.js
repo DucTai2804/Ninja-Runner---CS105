@@ -1,4 +1,4 @@
-import { scene, camera, controls } from './core.js';
+import { scene, camera, controls, renderer } from './core.js';
 import { fireTex } from './assets.js';
 import { state } from './state.js';
 import { sasuke, sasukeAnimations, sasukeAnimList, susanooModel, sasukeModel, susanooMixer, middleFingerBone, rightHandBone, susanooSwordHitbox, stopSusanooAnimation } from './character.js';
@@ -1197,4 +1197,37 @@ export function updateSkills(delta) {
             }
         });
     }
+// ==========================================
+// PRECOMPILE SHADERS
+// ==========================================
+
+export function precompileShaders() {
+    console.log("Bắt đầu biên dịch trước Shaders trên GPU...");
+    
+    // Tạm thời bật visible cho tất cả các Mesh nặng
+    let wasChidoriVisible = chidoriGroup.visible;
+    let wasSmokeVisible = susanooSmokeParticles.visible;
+    let wasSusanooVisible = susanooModel ? susanooModel.visible : false;
+
+    chidoriGroup.visible = true;
+    susanooSmokeParticles.visible = true;
+    if (susanooModel) susanooModel.visible = true;
+
+    // Tạo một hỏa cầu ảo để biên dịch Material của nó
+    const dummyGroup = new THREE.Group();
+    dummyGroup.add(new THREE.Mesh(fireballCoreGeo, fireballCoreMat));
+    dummyGroup.add(new THREE.Mesh(fireballAuraGeo, fireballAuraMat));
+    dummyGroup.add(new THREE.Mesh(particleGeo, particleMat));
+    scene.add(dummyGroup);
+
+    // Ép WebGLRenderer dịch toàn bộ Shaders sang mã máy GPU
+    renderer.compile(scene, camera);
+
+    // Trả lại trạng thái ẩn ban đầu
+    scene.remove(dummyGroup);
+    chidoriGroup.visible = wasChidoriVisible;
+    susanooSmokeParticles.visible = wasSmokeVisible;
+    if (susanooModel) susanooModel.visible = wasSusanooVisible;
+    
+    console.log("Đã biên dịch xong toàn bộ Shaders!");
 }
