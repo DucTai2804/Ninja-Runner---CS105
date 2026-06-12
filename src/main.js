@@ -49,6 +49,12 @@ function animate() {
     let delta = clock.getDelta();
     if (delta > 0.1) delta = 0.1;
 
+    // --- HIỆU ỨNG TIME DILATION (SLOW MOTION) KHI KÍCH HOẠT SUSANOO ---
+    if (state.isSusanooCutinActive) {
+        delta *= 0.05; // Thời gian trôi chậm đi 20 lần (5%)
+    }
+
+
     // --- CẬP NHẬT CHU KỲ NGÀY/ĐÊM ---
     let timeModeEl = document.getElementById('timeMode');
     let mode = timeModeEl ? timeModeEl.value : 'auto';

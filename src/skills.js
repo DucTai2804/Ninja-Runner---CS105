@@ -1141,13 +1141,12 @@ export function updateSkills(delta) {
             susanooBarInner.style.transform = 'scaleX(' + scale + ')';
         }
 
-        // 1. Quá trình biến hình: Đếm ngược 0.1s bung luồng khí Aura
+        // 1. Quá trình biến hình: Đếm ngược 0.1s ẩn Sasuke
         if (state.susanooTransformTimer > 0) {
             state.susanooTransformTimer -= delta;
             if (state.susanooTransformTimer <= 0) {
-                // Bung Aura, VÀ Ẩn Sasuke đi vì Susanoo là model riêng
+                // Ẩn Sasuke đi vì Susanoo là model riêng
                 if (sasukeModel) sasukeModel.visible = false;
-                createFlameBlast(); // Gọi FlameBlast
             }
         }
 
@@ -1227,19 +1226,28 @@ export function updateSkills(delta) {
         });
     }
 
-    // --- HIỆU ỨNG LỬA BÙNG NỔ (AURA BLAST) ---
+    // --- HIỆU ỨNG KHÓI BÙNG NỔ (SMOKE BLAST) ---
+    // Khôi phục lại delta thực tế cho khói để nó không bị ảnh hưởng bởi Slow Motion
+    let smokeDelta = state.isSusanooCutinActive ? delta * 20 : delta;
+
     for (let i = activeBlasts.length - 1; i >= 0; i--) {
         let b = activeBlasts[i];
-        b.life -= delta * 2.5; // Tốc độ biến mất
+        b.life -= smokeDelta * 0.8; // Tốc độ biến mất chậm lại, tồn tại hơn 1s (qua mốc 0.5s)
 
-        b.group.scale.x += delta * 4;
-        b.group.scale.z += delta * 4;
-        b.group.scale.y += delta * 5;
-        b.group.position.y += delta * 5;
+        // Tỏa rộng nhanh và khổng lồ để bằng kích thước Susanoo
+        b.group.scale.x += smokeDelta * 10;
+        b.group.scale.y += smokeDelta * 10;
+        b.group.scale.z += smokeDelta * 10;
 
-        b.coreMat.opacity = b.life;
-        b.outerMat.opacity = b.life * 0.8;
-        b.sphereMat.opacity = b.life * 0.9;
+        b.group.children.forEach(smoke => {
+            // Khói mờ dần
+            smoke.material.opacity = b.life * 0.8;
+            // Khói vừa xoay quanh tâm vừa bay tản ra ngoài một chút
+            smoke.material.rotation += smokeDelta * 0.5;
+            if (smoke.userData && smoke.userData.velocity) {
+                smoke.position.addScaledVector(smoke.userData.velocity, smokeDelta);
+            }
+        });
 
         if (b.life <= 0) {
             b.group.visible = false;
@@ -1268,43 +1276,41 @@ export function updateSkills(delta) {
     }
 }
 
-export const blastCoreGeo = new THREE.CylinderGeometry(0.1, 2, 10, 16, 1, true);
-export const blastCoreMatBase = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1.0, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
-
-export const blastOuterGeo = new THREE.CylinderGeometry(0.5, 4, 15, 16, 1, true);
-export const blastOuterMatBase = new THREE.MeshBasicMaterial({ color: 0xcc00ff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
-
-export const blastSphereGeo = new THREE.SphereGeometry(2, 16, 16);
-export const blastSphereMatBase = new THREE.MeshBasicMaterial({ color: 0xaa00ff, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending });
+// --- HIỆU ỨNG KHÓI BÙNG NỔ (SMOKE BLAST) THAY THẾ CONE BLAST ---
+const blastSmokeTex = createSmokeTexture(150, 50, 255); // Khói tím Susanoo
+const blastSmokeMatBase = new THREE.SpriteMaterial({
+    map: blastSmokeTex,
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.8,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false
+});
 
 export const blastPool = [];
-export const MAX_BLASTS = 2; // Thường chỉ có tối đa 2 vụ nổ (lúc bật và tắt Susanoo)
+export const MAX_BLASTS = 2; // Tối đa 2 vụ nổ khói cùng lúc
 
 for (let i = 0; i < MAX_BLASTS; i++) {
     let group = new THREE.Group();
     group.visible = false;
-    // Tạm thời chưa add vào sasuke ở đây để tránh lỗi vòng lặp import (ReferenceError: sasuke is not defined)
-
-    let coreMat = blastCoreMatBase.clone();
-    let coreMesh = new THREE.Mesh(blastCoreGeo, coreMat);
-    coreMesh.position.y = 5;
-    group.add(coreMesh);
-
-    let outerMat = blastOuterMatBase.clone();
-    let outerMesh = new THREE.Mesh(blastOuterGeo, outerMat);
-    outerMesh.position.y = 5;
-    group.add(outerMesh);
-
-    let sphereMat = blastSphereMatBase.clone();
-    let sphereMesh = new THREE.Mesh(blastSphereGeo, sphereMat);
-    sphereMesh.position.y = 2;
-    group.add(sphereMesh);
+    
+    // Thêm 12 sprite khói tạo thành một đám khói nổ
+    for(let j=0; j<12; j++) {
+        let smoke = new THREE.Sprite(blastSmokeMatBase.clone());
+        // Random vị trí ban đầu quanh tâm
+        smoke.position.set((Math.random()-0.5)*4, (Math.random()-0.5)*4 + 2, (Math.random()-0.5)*4);
+        smoke.scale.set(8, 8, 8); // Kích thước mỗi mảnh khói
+        smoke.material.rotation = Math.random() * Math.PI * 2;
+        
+        // Vận tốc tỏa ra
+        let vel = new THREE.Vector3(smoke.position.x, smoke.position.y - 2, smoke.position.z).normalize().multiplyScalar(2.0 + Math.random()*2.0);
+        smoke.userData = { velocity: vel, origPos: smoke.position.clone() };
+        
+        group.add(smoke);
+    }
 
     blastPool.push({
         group: group,
-        coreMat: coreMat,
-        outerMat: outerMat,
-        sphereMat: sphereMat,
         active: false,
         life: 1.0
     });
@@ -1313,20 +1319,21 @@ for (let i = 0; i < MAX_BLASTS; i++) {
 export let activeBlasts = [];
 export function createFlameBlast() {
     let b = blastPool.find(bl => !bl.active);
-    if (!b) return; // Hết vụ nổ dự phòng
+    if (!b) return;
 
     b.active = true;
     b.group.visible = true;
     b.life = 1.0;
     
-    // Reset scale
+    // Reset scale & position của group
     b.group.scale.set(1, 1, 1);
     b.group.position.y = 0;
     
-    // Reset opacity
-    b.coreMat.opacity = 1.0;
-    b.outerMat.opacity = 0.8;
-    b.sphereMat.opacity = 0.9;
+    // Reset từng hạt khói
+    b.group.children.forEach(smoke => {
+        smoke.position.copy(smoke.userData.origPos);
+        smoke.material.opacity = 0.8;
+    });
 
     activeBlasts.push(b);
 }

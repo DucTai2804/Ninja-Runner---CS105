@@ -1,12 +1,22 @@
 import { state } from './state.js';
 import { LANE_POSITIONS } from './config.js';
 import { playAnimation, sasukeAnimations, sasukeAnimList, susanooAnimations, susanooModel, sasukeHitbox, playSusanooAnimation, susanooLight } from './character.js';
-import { chidoriGroup } from './skills.js';
+import { chidoriGroup, createFlameBlast } from './skills.js';
 import { treeInstancedMeshes } from './environment.js';
 import { showHitbox, toggleHitboxes } from './physics.js';
 import { susanooBarContainer, susanooBarInner } from './ui.js';
 import { resetGame } from './logic.js';
 import { pauseAllShurikens, resumeAllShurikens } from './obstacles.js';
+
+function triggerSkillAnimation(skillNum) {
+    const el = document.getElementById('skill' + skillNum + '_icon');
+    if (el) {
+        el.classList.add('skill-active');
+        setTimeout(() => {
+            el.classList.remove('skill-active');
+        }, 150);
+    }
+}
 
 export function setupInputs() {
     state.currentLane = 1; // Bắt đầu ở làn giữa (0: Trái, 1: Giữa, 2: Phải)
@@ -93,6 +103,7 @@ export function setupInputs() {
             // Kích hoạt Hoạt ảnh Tung chiêu (nếu không bận làm gì khác và không bật Susanoo)
             if (!state.isJumping && !state.isSliding && !state.isCastingSkill1 && !state.isSusanooActive) {
                 state.isCastingSkill1 = true;
+                triggerSkillAnimation(1);
                 let skillAnim = Object.keys(sasukeAnimations).find(k => k.includes('fireball')) || sasukeAnimList[0].name;
 
                 // Ép fadeDuration = 0 vì user đã đồng bộ mượt sẵn từ Blender
@@ -113,6 +124,7 @@ export function setupInputs() {
         if (event.key === '2') {
             if (!state.isJumping && !state.isSliding && !state.isCastingSkill1 && !state.isCastingChidori && !state.isSusanooActive) {
                 state.isCastingChidori = true;
+                triggerSkillAnimation(2);
                 state.chidoriFadeTimer = 0;
                 state.currentSpeed = state.baseSpeed * 4; // Tăng tốc cảnh vật chạy
 
@@ -134,37 +146,80 @@ export function setupInputs() {
 
         // Skill 3: Susanoo (Bất tử & Bay)
         if (event.key === '3') {
-            if (!state.isSusanooActive) {
-                state.isSusanooActive = true;
-                if (susanooLight) susanooLight.visible = true; // Bật sáng Susanoo
-                
-                // Tự động chuyển nhân vật về làn giữa
-                state.currentLane = 1;
-                state.targetLaneX = LANE_POSITIONS[1];
-                
-                state.susanooTimer = 20.0;
-                
-                if (susanooBarContainer) susanooBarContainer.style.display = 'block';
-                if (susanooBarInner) susanooBarInner.style.transform = 'scaleX(1)';
-                state.currentSpeed = state.baseSpeed * 4; // Bức tốc (giống Chidori)
-                state.susanooTransformTimer = 0.1; // Chờ 0.1s rồi bung luồng khí (không ẩn Sasuke)
-                state.cameraTransitionTime = 1.0; // Bắt đầu chuyển đổi góc camera (1 giây)
+            if (!state.isSusanooActive && !state.isSusanooCutinActive) {
+                state.isSusanooCutinActive = true;
+                triggerSkillAnimation(3);
 
-                // Phát âm thanh bay
-                if (window.susanooFlyAudio) {
-                    if (window.susanooFlyAudio.isCustomWebAudio) {
-                        window.susanooFlyAudio.play();
-                        window.fadeToVolume(window.susanooFlyAudio, 0.8, 100);
-                    } else {
-                        window.susanooFlyAudio.currentTime = 0;
-                        window.susanooFlyAudio.play().catch(e => console.log("Lỗi phát audio susanoo:", e));
-                    }
+                // Phát âm thanh Cut-in
+                if (window.susanooActAudio) {
+                    window.susanooActAudio.currentTime = 0;
+                    window.susanooActAudio.play().catch(e => console.log(e));
                 }
 
-                // Hiện các ngọn núi khổng lồ
-                if (treeInstancedMeshes.length >= 4) {
-                    treeInstancedMeshes[0].mesh.visible = true;
-                    treeInstancedMeshes[1].mesh.visible = true;
+                // Hiện Cut-in hình ảnh Mắt
+                let cutin = document.getElementById('dualEyesCutin');
+                if (cutin) {
+                    cutin.style.opacity = '1';
+                    cutin.style.transform = 'translate(-50%, -50%) scale(1)';
+                    // Mờ đi sau 0.4s để tạo cảm giác chớp nhoáng
+                    setTimeout(() => {
+                        cutin.style.opacity = '0';
+                        cutin.style.transform = 'translate(-50%, -50%) scale(1.1)';
+                    }, 400); 
+                }
+
+                // Hiệu ứng Time Dilation cho Âm thanh (Làm chậm tiếng BGM)
+                if (window.bgmAudio) {
+                    window.bgmAudio.preservesPitch = false; // Tắt giữ cao độ để tạo tiếng trầm vang
+                    window.bgmAudio.playbackRate = 0.3; // Chậm đi
+                }
+
+                // Chờ 0.5 giây rồi mới chính thức bật Susanoo
+                setTimeout(() => {
+                    // Trả lại tốc độ cho BGM
+                    if (window.bgmAudio) {
+                        window.bgmAudio.playbackRate = 1.0;
+                        window.bgmAudio.preservesPitch = true;
+                    }
+
+                    // Nếu game đã bị reset hoặc chuyển cảnh thì không kích hoạt nữa
+                    if (!state.isSusanooCutinActive) return;
+                    
+                    state.isSusanooCutinActive = false;
+                    state.isSusanooActive = true;
+                    
+                    // Kích hoạt hiệu ứng vụ nổ khói khi Susanoo chính thức xuất hiện
+                    createFlameBlast();
+
+                    if (susanooLight) susanooLight.visible = true; // Bật sáng Susanoo
+                    
+                    // Tự động chuyển nhân vật về làn giữa
+                    state.currentLane = 1;
+                    state.targetLaneX = LANE_POSITIONS[1];
+                    
+                    state.susanooTimer = 20.0;
+                    
+                    if (susanooBarContainer) susanooBarContainer.style.display = 'block';
+                    if (susanooBarInner) susanooBarInner.style.transform = 'scaleX(1)';
+                    state.currentSpeed = state.baseSpeed * 4; // Bức tốc (giống Chidori)
+                    state.susanooTransformTimer = 0.1; // Chờ 0.1s rồi bung luồng khí (không ẩn Sasuke)
+                    state.cameraTransitionTime = 1.0; // Bắt đầu chuyển đổi góc camera (1 giây)
+
+                    // Phát âm thanh bay
+                    if (window.susanooFlyAudio) {
+                        if (window.susanooFlyAudio.isCustomWebAudio) {
+                            window.susanooFlyAudio.play();
+                            window.fadeToVolume(window.susanooFlyAudio, 0.8, 100);
+                        } else {
+                            window.susanooFlyAudio.currentTime = 0;
+                            window.susanooFlyAudio.play().catch(e => console.log("Lỗi phát audio susanoo:", e));
+                        }
+                    }
+
+                    // Hiện các ngọn núi khổng lồ
+                    if (treeInstancedMeshes.length >= 4) {
+                        treeInstancedMeshes[0].mesh.visible = true;
+                        treeInstancedMeshes[1].mesh.visible = true;
                     treeInstancedMeshes[2].mesh.visible = true;
                 }
 
@@ -175,6 +230,7 @@ export function setupInputs() {
                         playSusanooAnimation(flyAnim, true, 0.2);
                     }
                 }
+                }, 500); // KẾT THÚC SETTIMEOUT 500ms
             } else if (!state.isSusanooSlashing) {
                 // Chờ hoạt ảnh chém xong mới cho phép chém tiếp
                 state.isSusanooSlashing = true;
@@ -281,8 +337,10 @@ if (btnStartGame && startMenuUI) {
         precompileShaders();
         precompileObstacles(renderer, camera);
 
-        // 1. Ẩn màn hình Menu
+        // 1. Ẩn màn hình Menu và hiện Skill UI
         startMenuUI.style.display = 'none';
+        let skillUI = document.getElementById('skillUI');
+        if (skillUI) skillUI.style.display = 'flex';
         
         // 2. Mở khóa game (Bỏ Pause)
         state.isPaused = false;

@@ -14,14 +14,60 @@
             display: block;
         }
 
-        #info {
+        #skillUI {
             position: absolute;
-            top: 10px;
-            left: 10px;
+            top: 20px;
+            left: 20px;
+            display: none; /* Hide initially */
+            flex-direction: column;
+            gap: 20px;
+            z-index: 100;
+        }
+
+        .skill-icon {
+            position: relative;
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: 3px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+            transition: transform 0.1s ease-out;
+            background-color: #333;
+        }
+
+        .skill-icon img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 50%;
+            display: block;
+        }
+
+        .skill-key {
+            position: absolute;
+            bottom: -5px;
+            right: -5px;
+            background: rgba(0, 0, 0, 0.8);
             color: white;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             font-family: sans-serif;
-            text-shadow: 1px 1px 2px black;
-            pointer-events: none;
+            font-size: 16px;
+            font-weight: bold;
+            border: 3px solid rgba(255, 255, 255, 0.5);
+            box-sizing: border-box;
+            padding-top: 1px; /* Căn giữa quang học (Optical centering) */
+        }
+
+        /* Animation class when a skill is used */
+        .skill-active {
+            transform: scale(1.3);
+            border-color: #00e5ff;
+            box-shadow: 0 0 20px #00e5ff;
         }
     </style>
 </head>
@@ -87,13 +133,23 @@
             <option value="9">Mẫu 9: Cột gỗ + Phi tiêu chìm</option>
         </select>
     </div>
-    <div id="info">
-        <h3>Ninja Runner - Đồ án ĐHMT</h3>
-        <p>Phím trái/phải: Di chuyển</p>
-        <p>Phím 1: Đại hỏa cầu</p>
-        <p>Phím 2: Chidori (Xuyên phá)</p>
-        <p>Phím 3: Susanoo (Bất tử 20s)</p>
+    <div id="skillUI">
+        <div id="skill3_icon" class="skill-icon">
+            <img src="textures/sasuke's skillset/skill3.png" alt="Susanoo" />
+            <div class="skill-key">3</div>
+        </div>
+        <div id="skill2_icon" class="skill-icon">
+            <img src="textures/sasuke's skillset/skill2.png" alt="Chidori" />
+            <div class="skill-key">2</div>
+        </div>
+        <div id="skill1_icon" class="skill-icon">
+            <img src="textures/sasuke's skillset/skill1.png" alt="Katon" />
+            <div class="skill-key">1</div>
+        </div>
     </div>
+
+    <!-- Màn hình Cut-in Susanoo (Dual Eyes) -->
+    <img id="dualEyesCutin" src="textures/dual_eyes.png" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.8); opacity: 0; pointer-events: none; z-index: 150; width: 80%; max-width: 800px; transition: opacity 0.1s ease-in, transform 0.6s ease-out;" />
 
     <!-- Màn hình Bắt đầu (Start Menu) -->
     <div id="startMenuUI"
@@ -105,6 +161,15 @@
             style="padding: 20px 50px; font-size: 2rem; font-weight: bold; background: linear-gradient(90deg, #ff8a00, #e52e71); color: white; border: none; border-radius: 50px; cursor: pointer; box-shadow: 0 0 20px rgba(229, 46, 113, 0.5); transition: transform 0.2s;">
             ▶ CHƠI GAME
         </button>
+        
+        <div style="margin-top: 50px; color: #ddd; text-align: center; font-size: 1.2rem; line-height: 1.8; text-shadow: 1px 1px 5px black; background: rgba(0,0,0,0.5); padding: 20px 40px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.2);">
+            <h3 style="margin-top: 0; color: #00e5ff; font-size: 1.5rem; margin-bottom: 15px;">HƯỚNG DẪN</h3>
+            <p style="margin: 5px 0;"><strong>Phím A / D (hoặc Trái / Phải):</strong> Lách trái/phải</p>
+            <p style="margin: 5px 0;"><strong>Phím 1:</strong> Đại hỏa cầu (Phá chướng ngại vật)</p>
+            <p style="margin: 5px 0;"><strong>Phím 2:</strong> Chidori (Phóng tốc độ cao)</p>
+            <p style="margin: 5px 0;"><strong>Phím 3:</strong> Susanoo (Bất tử & Bay tự do)</p>
+            <p style="margin: 5px 0; color: #ffc107;"><strong>Space:</strong> Tạm dừng</p>
+        </div>
     </div>
 
     <!-- Màn hình hiển thị khi thua game -->

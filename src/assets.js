@@ -62,6 +62,10 @@ susanooSlashAudio.volume = 1.0;
 susanooSlashAudio.dataset.origVol = 2.0; // Khuếch đại x2
 window.susanooSlashAudio = susanooSlashAudio;
 
+export const susanooActAudio = new Audio('audios/susanoo_activation.wav');
+susanooActAudio.volume = 1.0;
+window.susanooActAudio = susanooActAudio;
+
 // Cải tiến cấp độ Phần cứng (Hardware-level): Sử dụng Web Audio API
 // Triệt tiêu 100% lỗi Zipper Noise (rụt rụt) do trình duyệt xử lý volume thay đổi quá chậm
 const AudioContext = window.AudioContext || window.webkitAudioContext;

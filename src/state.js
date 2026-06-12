@@ -39,6 +39,8 @@ export const state = {
     chidoriTimer: 0,
     chidoriFadeTimer: 0,
     isSusanooActive: false,
+    isSusanooCutinActive: false,
+    susanooCutinTimer: 0,
     susanooTimer: 0,
     susanooTransformTimer: 0,
     isSusanooSlashing: false,
