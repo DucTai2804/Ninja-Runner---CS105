@@ -167,6 +167,34 @@ export function updateTreeMatrices() {
 }
 updateTreeMatrices();
 
+export function updateEnvironment(delta, moveDistance) {
+    // Di chuyển CÁC TẤM MẶT ĐẤT
+    for (let i = 0; i < groundPlanes.length; i++) {
+        groundPlanes[i].position.z += moveDistance;
+
+        // Khi một tấm trôi hoàn toàn ra sau lưng camera (z > 200)
+        if (groundPlanes[i].position.z > 200) {
+            // Lùi chính xác 600m (3 tấm x 200m) để duy trì cự ly tuyệt đối
+            groundPlanes[i].position.z -= 600;
+        }
+    }
+
+    // Di chuyển dữ liệu ảo của cây cối và cập nhật Instancing
+    let treesMoved = false;
+    for (let i = 0; i < TOTAL_TREES; i++) {
+        treeData[i].z += moveDistance;
+        if (treeData[i].z > 15) {
+            // Lùi chính xác 400m để duy trì khoảng cách đều đặn vĩnh viễn
+            treeData[i].z -= 400;
+        }
+        treesMoved = true;
+    }
+
+    if (treesMoved) {
+        updateTreeMatrices();
+    }
+}
+
 export function toggleMountains(forceState) {
     if (forceState !== undefined) {
         state.hideTrees = forceState;

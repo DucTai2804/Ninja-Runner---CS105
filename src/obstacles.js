@@ -1,5 +1,6 @@
 import { scene, renderer, camera } from './core.js';
 import { CONFIG, LANE_POSITIONS } from './config.js';
+import { state } from './state.js';
 import { mountainTex, giantRockTex, treeTex, gltfLoader } from './assets.js';
 import { hash } from './utils.js';
 
@@ -129,6 +130,7 @@ export function spawnObstaclePattern(rowObstacles, rowCoins = null, practicePatt
         obs.rotSpeedY = 0;
         obs.activeType = 'none';
         obs.isRolling = false;
+        obs.audioPlayed = false; // Reset cờ phát âm thanh
     });
 
     let rand = Math.random();
@@ -595,5 +597,149 @@ export function precompileObstacles(renderer, camera) {
     }
     if (firstRow.coins && firstRow.coins.length > 0) {
         firstRow.coins[0].mesh.visible = false;
+    }
+}
+
+export function updateObstacles(delta, moveDistance) {
+    let closestShurikenZ = Infinity;
+    let hasShuriken = false;
+
+    for (let i = 0; i < obstacleRows.length; i++) {
+        let row = obstacleRows[i];
+        row.group.position.z += moveDistance;
+
+        // Reset vị trí nếu vượt qua sau lưng camera
+        if (row.group.position.z > 75) {
+            row.group.position.z -= 440; // 8 hàng x 55m = 440m
+            spawnObstaclePattern(row.obstacles, row.coins); // Đẻ ra trận đồ bát quái mới và rải tiền!
+        }
+
+        // Bắt buộc ép Game cập nhật tọa độ tuyệt đối
+        row.group.updateMatrixWorld(true);
+
+        // Kiểm tra và cập nhật chướng ngại vật đang rơi/lăn
+        for (let j = 0; j < 3; j++) {
+            let obs = row.obstacles[j];
+            if (obs.activeType !== 'none') {
+                let mesh = null;
+                if (obs.activeType === 'shuriken') mesh = obs.shuriken;
+                else if (obs.activeType === 'tree') mesh = obs.tree;
+                else if (obs.activeType === 'giantRock') mesh = obs.giantRock;
+                else if (obs.activeType === 'mountainWall') mesh = obs.mountainWall;
+                else mesh = obs.rock;
+
+                // --- XỬ LÝ VẬT THỂ RƠI VÀ BÓNG CẢNH BÁO ---
+                if (obs.isFalling) {
+                    if (obs.shadow) {
+                        let progress = 1.0 - ((mesh.position.y - obs.targetY) / (obs.startY - obs.targetY));
+                        if (progress > 1.0) progress = 1.0;
+                        if (progress < 0) progress = 0;
+
+                        obs.shadow.scale.setScalar(0.5 + progress * 1.0);
+                        obs.shadow.material.opacity = 0.4 + (progress * 0.4);
+                    }
+
+                    if (row.group.position.z >= obs.triggerZ) {
+                        let dropRate = (obs.startY - obs.targetY) / Math.abs(obs.triggerZ);
+                        let baseMoveDistance = state.baseSpeed * (delta * 60);
+                        let actualDrop = dropRate * baseMoveDistance * obs.fallSpeedMult;
+                        mesh.position.y -= actualDrop;
+
+                        if (obs.activeType === 'rock') {
+                            obs.rotSpeedX = -0.6;
+                            obs.rotSpeedY = -0.4;
+                        } else if (obs.activeType === 'tree') {
+                            obs.rotSpeedX = -0.5; // Lăn siêu tốc
+                        }
+
+                        mesh.rotation.x += obs.rotSpeedX;
+                        mesh.rotation.y += obs.rotSpeedY;
+
+                        if (mesh.position.y <= obs.targetY) {
+                            mesh.position.y = obs.targetY;
+                            obs.isFalling = false;
+                            if (obs.shadow) obs.shadow.material.opacity = 0.9;
+                        }
+                    } else {
+                        mesh.position.y = obs.startY;
+                    }
+                } else if (obs.rotSpeedX !== 0 || obs.rotSpeedY !== 0) {
+                    obs.rotSpeedX *= 0.93;
+                    obs.rotSpeedY *= 0.93;
+                    mesh.rotation.x += obs.rotSpeedX;
+                    mesh.rotation.y += obs.rotSpeedY;
+
+                    if (Math.abs(obs.rotSpeedX) < 0.01) obs.rotSpeedX = 0;
+                    if (Math.abs(obs.rotSpeedY) < 0.01) obs.rotSpeedY = 0;
+                }
+
+                if (mesh && mesh.visible) {
+                    if (obs.activeType === 'shuriken') {
+                        mesh.rotation.y += 0.5;
+                        let shurikenSpeed = 0.4; // Tốc độ xé gió
+                        mesh.position.z += shurikenSpeed * (delta * 60);
+                        
+                        hasShuriken = true;
+                        let absZ = row.group.position.z + mesh.position.z;
+                        if (Math.abs(absZ) < Math.abs(closestShurikenZ)) {
+                            closestShurikenZ = absZ;
+                        }
+                        
+                        // Phát audio một lần duy nhất khi Shuriken vừa ló dạng khỏi sương mù (theo người dùng xác nhận là khoảng -70)
+                        if (!obs.audioPlayed && absZ > -70) {
+                            obs.audioPlayed = true;
+                            if (window.shurikenAudio) {
+                                obs.myAudio = window.shurikenAudio.cloneNode();
+                                obs.myAudio.volume = 0; // Bắt đầu bằng 0 để fade-in
+                                obs.myAudio.play().catch(e => console.log("Lỗi phát audio shuriken:", e));
+                            }
+                        }
+
+                        // Điều chỉnh âm lượng độc lập cho từng phi tiêu
+                        if (obs.audioPlayed && obs.myAudio && !obs.myAudio.paused) {
+                            let distance = Math.abs(absZ);
+                            let vol = 0;
+                            if (absZ <= 0) {
+                                vol = 1.0 - (distance / 70.0);
+                            } else {
+                                vol = 1.0 - (distance / 70.0);
+                            }
+                            
+                            if (vol < 0) {
+                                vol = 0;
+                                // Tắt hẳn audio và giải phóng bộ nhớ khi bay qua mốc 70
+                                if (absZ > 70) {
+                                    obs.myAudio.pause();
+                                    obs.myAudio = null;
+                                }
+                            }
+                            
+                            if (vol > 1) vol = 1;
+                            if (obs.myAudio) { // Check lại vì có thể vừa bị set null
+                                obs.myAudio.volume = vol * 0.8;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+export function pauseAllShurikens() {
+    for (let row of obstacleRows) {
+        for (let obs of row.obstacles) {
+            if (obs.myAudio && !obs.myAudio.paused) obs.myAudio.pause();
+        }
+    }
+}
+
+export function resumeAllShurikens() {
+    for (let row of obstacleRows) {
+        for (let obs of row.obstacles) {
+            if (obs.activeType === 'shuriken' && obs.myAudio && obs.myAudio.paused) {
+                obs.myAudio.play().catch(e => console.log(e));
+            }
+        }
     }
 }

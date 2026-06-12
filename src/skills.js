@@ -12,6 +12,11 @@ import { MAX_PARTICLES } from './config.js';
 
 let globalSkillTime = 0; // Thêm biến lưu trữ thời gian tổng cho Shader
 
+// --- TỐI ƯU GARBAGE COLLECTION ---
+const _tempSize = new THREE.Vector3();
+const _tempCenter = new THREE.Vector3();
+const _tempLocalPt = new THREE.Vector3();
+
 export let fireballs = [];
 export let fireParticles = [];
 export let particlePool = [];
@@ -1087,10 +1092,8 @@ export function updateSkills(delta) {
             
             // Tính toán kích thước của lưỡi kiếm
             susanooSwordHitbox.geometry.computeBoundingBox();
-            let size = new THREE.Vector3();
-            let center = new THREE.Vector3();
-            susanooSwordHitbox.geometry.boundingBox.getSize(size);
-            susanooSwordHitbox.geometry.boundingBox.getCenter(center);
+            susanooSwordHitbox.geometry.boundingBox.getSize(_tempSize);
+            susanooSwordHitbox.geometry.boundingBox.getCenter(_tempCenter);
             
             for (let i = 0; i < swordParticleCount; i++) {
                 let pData = swordParticleData[i];
@@ -1106,17 +1109,17 @@ export function updateSkills(delta) {
                     if (state.isSusanooSlashing && spawnedThisFrame < 6) { // Sinh ra 6 hạt mỗi frame
                         pData.life = 1.0;
                         
-                        let localPt = new THREE.Vector3(
-                            center.x + (Math.random() - 0.5) * size.x * 2.0,
-                            center.y + (Math.random() - 0.5) * size.y * 1.5, // Dọc theo lưỡi kiếm
-                            center.z + (Math.random() - 0.5) * size.z * 2.0
+                        _tempLocalPt.set(
+                            _tempCenter.x + (Math.random() - 0.5) * _tempSize.x * 2.0,
+                            _tempCenter.y + (Math.random() - 0.5) * _tempSize.y * 1.5, // Dọc theo lưỡi kiếm
+                            _tempCenter.z + (Math.random() - 0.5) * _tempSize.z * 2.0
                         );
                         
-                        susanooSwordHitbox.localToWorld(localPt); // Chuyển ra world space để đốm sáng nằm lại trên không trung
+                        susanooSwordHitbox.localToWorld(_tempLocalPt); // Chuyển ra world space để đốm sáng nằm lại trên không trung
                         
-                        positions[i * 3] = localPt.x;
-                        positions[i * 3 + 1] = localPt.y;
-                        positions[i * 3 + 2] = localPt.z;
+                        positions[i * 3] = _tempLocalPt.x;
+                        positions[i * 3 + 1] = _tempLocalPt.y;
+                        positions[i * 3 + 2] = _tempLocalPt.z;
                         
                         // Quán tính lơ lửng sau khi chém
                         pData.speedX = (Math.random() - 0.5) * 5.0;
@@ -1229,13 +1232,10 @@ export function updateSkills(delta) {
         let b = activeBlasts[i];
         b.life -= delta * 2.5; // Tốc độ biến mất
 
-        // Vẫn giữ tốc độ phình to ấn tượng
-        b.group.scale.x += delta * 12;
-        b.group.scale.z += delta * 12;
-        b.group.scale.y += delta * 15;
-        
-        // Căn chỉnh vị trí để không nuốt chửng camera gây tụt FPS
-        b.group.position.y += delta * 2;
+        b.group.scale.x += delta * 4;
+        b.group.scale.z += delta * 4;
+        b.group.scale.y += delta * 5;
+        b.group.position.y += delta * 5;
 
         b.coreMat.opacity = b.life;
         b.outerMat.opacity = b.life * 0.8;
@@ -1247,18 +1247,35 @@ export function updateSkills(delta) {
             activeBlasts.splice(i, 1);
         }
     }
+
+    // --- CẬP NHẬT HỆ THỐNG HẠT LỬA (PARTICLE POOL) ---
+    for (let i = fireParticles.length - 1; i >= 0; i--) {
+        let pObj = fireParticles[i];
+        pObj.life -= delta * pObj.decay;
+
+        if (pObj.life <= 0) {
+            pObj.mesh.visible = false; // Trả lại Pool (ẩn đi) thay vì xóa khỏi Scene
+            fireParticles.splice(i, 1);
+        } else {
+            pObj.mesh.scale.setScalar(pObj.life); // Teo nhỏ dần thành tàn lửa
+            pObj.mesh.position.y += delta * 3.0; // Bốc lên cao theo nhiệt
+
+            // Xoay tự do trong không gian 3D thực thụ
+            pObj.mesh.rotation.x += delta * 3.0;
+            pObj.mesh.rotation.y += delta * 3.0;
+            pObj.mesh.rotation.z += delta * 3.0;
+        }
+    }
 }
 
-export const blastCoreGeo = new THREE.CylinderGeometry(0.1, 4, 15, 32, 1, true);
-// Dùng FrontSide thay vì DoubleSide để giảm 50% gánh nặng vẽ (Fill-rate)
-export const blastCoreMatBase = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1.0, blending: THREE.AdditiveBlending, side: THREE.FrontSide });
+export const blastCoreGeo = new THREE.CylinderGeometry(0.1, 2, 10, 16, 1, true);
+export const blastCoreMatBase = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1.0, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
 
-export const blastOuterGeo = new THREE.CylinderGeometry(1, 8, 20, 32, 1, true);
-// Dùng FrontSide để chặn Overdraw khi camera lọt vào trong vụ nổ
-export const blastOuterMatBase = new THREE.MeshBasicMaterial({ color: 0xcc00ff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, side: THREE.FrontSide });
+export const blastOuterGeo = new THREE.CylinderGeometry(0.5, 4, 15, 16, 1, true);
+export const blastOuterMatBase = new THREE.MeshBasicMaterial({ color: 0xcc00ff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
 
-export const blastSphereGeo = new THREE.SphereGeometry(4, 32, 32);
-export const blastSphereMatBase = new THREE.MeshBasicMaterial({ color: 0xaa00ff, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, side: THREE.FrontSide });
+export const blastSphereGeo = new THREE.SphereGeometry(2, 16, 16);
+export const blastSphereMatBase = new THREE.MeshBasicMaterial({ color: 0xaa00ff, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending });
 
 export const blastPool = [];
 export const MAX_BLASTS = 2; // Thường chỉ có tối đa 2 vụ nổ (lúc bật và tắt Susanoo)

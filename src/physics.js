@@ -1,8 +1,8 @@
-import { scene } from './core.js';
+import { scene, camera } from './core.js';
 import { state } from './state.js';
 import { sasuke, sasukeAnimations, sasukeAnimList, playAnimation, sasukeHitbox, susanooHitbox, susanooSwordHitbox } from './character.js';
 import { fireballs, fireParticles, getNextParticle, fireLight } from './skills.js';
-import { obstacleRows, spawnObstaclePattern } from './obstacles.js';
+import { obstacleRows, spawnObstaclePattern, pauseAllShurikens } from './obstacles.js';
 import { coinUI } from './ui.js';
 
 // ==========================================
@@ -14,6 +14,12 @@ export let showHitbox = false;
 // Box3 dùng cho chướng ngại vật (AABB) và hỏa cầu
 export const obsBox = new THREE.Box3();
 export const fireballBox = new THREE.Box3();
+
+// --- TỐI ƯU GARBAGE COLLECTION (Tránh new Object trong vòng lặp) ---
+const _swordBox = new THREE.Box3();
+const _susanooBox = new THREE.Box3();
+const _tempCenter = new THREE.Vector3();
+const _tempSize = new THREE.Vector3();
 
 // OBB dùng cho Sasuke (Được xoay nghiêng theo mô hình)
 export const sasukeOBB_base = new THREE.OBB(new THREE.Vector3(), new THREE.Vector3(1.5 / 2, 3.5 / 2, 1.5 / 2));
@@ -80,35 +86,23 @@ export function updatePhysics(delta, moveDistance) {
     }
 
     // --- CẬP NHẬT HITBOX KIẾM & THÂN THỂ SUSANOO ---
-    let swordBox = new THREE.Box3();
-    let susanooBox = new THREE.Box3();
     let isSwordSlashing = false;
 
     if (state.isSusanooActive) {
         if (susanooHitbox) {
             susanooHitbox.updateMatrixWorld(true);
-            susanooBox.setFromObject(susanooHitbox);
+            _susanooBox.setFromObject(susanooHitbox);
         }
         if (state.isSusanooSlashing && susanooSwordHitbox) {
             susanooSwordHitbox.updateMatrixWorld(true);
-            swordBox.setFromObject(susanooSwordHitbox);
+            _swordBox.setFromObject(susanooSwordHitbox);
             isSwordSlashing = true;
         }
     }
 
-    // 4. Xử lý Chướng ngại vật (Đá lở) & Va chạm Sasuke
+    // 4. Kiểm tra va chạm Sasuke với từng chướng ngại vật
     for (let i = 0; i < obstacleRows.length; i++) {
         let row = obstacleRows[i];
-        row.group.position.z += moveDistance;
-
-        // Reset vị trí nếu vượt qua sau lưng camera
-        if (row.group.position.z > 75) {
-            row.group.position.z -= 440; // 8 hàng x 55m = 440m
-            spawnObstaclePattern(row.obstacles, row.coins); // Đẻ ra trận đồ bát quái mới và rải tiền!
-        }
-
-        // Bắt buộc ép Game cập nhật tọa độ tuyệt đối trước khi xét va chạm
-        row.group.updateMatrixWorld(true);
 
         // Kiểm tra va chạm Sasuke với từng chướng ngại vật
         for (let j = 0; j < 3; j++) {
@@ -121,58 +115,7 @@ export function updatePhysics(delta, moveDistance) {
                 else if (obs.activeType === 'mountainWall') mesh = obs.mountainWall;
                 else mesh = obs.rock;
 
-                // --- XỬ LÝ VẬT THỂ RƠI VÀ BÓNG CẢNH BÁO ---
-                if (obs.isFalling) {
-                    if (obs.shadow) {
-                        let progress = 1.0 - ((mesh.position.y - obs.targetY) / (obs.startY - obs.targetY));
-                        if (progress > 1.0) progress = 1.0;
-                        if (progress < 0) progress = 0;
-
-                        obs.shadow.scale.setScalar(0.5 + progress * 1.0);
-                        obs.shadow.material.opacity = 0.4 + (progress * 0.4);
-                    }
-
-                    if (row.group.position.z >= obs.triggerZ) {
-                        let dropRate = (obs.startY - obs.targetY) / Math.abs(obs.triggerZ);
-                        let baseMoveDistance = state.baseSpeed * (delta * 60);
-                        let actualDrop = dropRate * baseMoveDistance * obs.fallSpeedMult;
-                        mesh.position.y -= actualDrop;
-
-                        if (obs.activeType === 'rock') {
-                            obs.rotSpeedX = -0.6;
-                            obs.rotSpeedY = -0.4;
-                        } else if (obs.activeType === 'tree') {
-                            obs.rotSpeedX = -0.5; // Lăn siêu tốc
-                        }
-
-                        mesh.rotation.x += obs.rotSpeedX;
-                        mesh.rotation.y += obs.rotSpeedY;
-
-                        if (mesh.position.y <= obs.targetY) {
-                            mesh.position.y = obs.targetY;
-                            obs.isFalling = false;
-                            if (obs.shadow) obs.shadow.material.opacity = 0.9;
-                        }
-                    } else {
-                        mesh.position.y = obs.startY;
-                    }
-                } else if (obs.rotSpeedX !== 0 || obs.rotSpeedY !== 0) {
-                    obs.rotSpeedX *= 0.93;
-                    obs.rotSpeedY *= 0.93;
-                    mesh.rotation.x += obs.rotSpeedX;
-                    mesh.rotation.y += obs.rotSpeedY;
-
-                    if (Math.abs(obs.rotSpeedX) < 0.01) obs.rotSpeedX = 0;
-                    if (Math.abs(obs.rotSpeedY) < 0.01) obs.rotSpeedY = 0;
-                }
-
                 if (mesh && mesh.visible) {
-                    if (obs.activeType === 'shuriken') {
-                        mesh.rotation.y += 0.5;
-                        let shurikenSpeed = 0.4; // Tốc độ xé gió
-                        mesh.position.z += shurikenSpeed * (delta * 60);
-                    }
-
                     let oldRot = mesh.rotation.clone();
                     if (obs.activeType === 'rock' || obs.activeType === 'tree' || obs.activeType === 'giantRock') {
                         mesh.rotation.set(0, 0, 0);
@@ -200,35 +143,31 @@ export function updatePhysics(delta, moveDistance) {
                     }
 
                     if (obs.activeType === 'shuriken') {
-                        let center = new THREE.Vector3();
-                        let size = new THREE.Vector3();
-                        obsBox.getCenter(center);
-                        obsBox.getSize(size);
+                        obsBox.getCenter(_tempCenter);
+                        obsBox.getSize(_tempSize);
 
-                        if (size.x > 1.8) size.x = 1.8;
-                        if (size.z > 1.8) size.z = 1.8;
+                        if (_tempSize.x > 1.8) _tempSize.x = 1.8;
+                        if (_tempSize.z > 1.8) _tempSize.z = 1.8;
 
-                        obsBox.setFromCenterAndSize(center, size);
+                        obsBox.setFromCenterAndSize(_tempCenter, _tempSize);
                     } else if (obs.activeType === 'giantRock' || obs.activeType === 'mountainWall') {
-                        let center = new THREE.Vector3();
-                        let size = new THREE.Vector3();
-                        obsBox.getCenter(center);
-                        obsBox.getSize(size);
+                        obsBox.getCenter(_tempCenter);
+                        obsBox.getSize(_tempSize);
 
                         if (obs.hitboxCut) {
-                            size.x -= obs.hitboxCut.x;
-                            size.y -= obs.hitboxCut.y;
-                            size.z -= obs.hitboxCut.z;
-                            if (obs.hitboxCut.offsetX) center.x += obs.hitboxCut.offsetX;
-                            if (obs.hitboxCut.offsetY) center.y += obs.hitboxCut.offsetY;
-                            if (obs.hitboxCut.offsetZ) center.z += obs.hitboxCut.offsetZ;
+                            _tempSize.x -= obs.hitboxCut.x;
+                            _tempSize.y -= obs.hitboxCut.y;
+                            _tempSize.z -= obs.hitboxCut.z;
+                            if (obs.hitboxCut.offsetX) _tempCenter.x += obs.hitboxCut.offsetX;
+                            if (obs.hitboxCut.offsetY) _tempCenter.y += obs.hitboxCut.offsetY;
+                            if (obs.hitboxCut.offsetZ) _tempCenter.z += obs.hitboxCut.offsetZ;
                         }
 
-                        if (size.x < 0.1) size.x = 0.1;
-                        if (size.y < 0.1) size.y = 0.1;
-                        if (size.z < 0.1) size.z = 0.1;
+                        if (_tempSize.x < 0.1) _tempSize.x = 0.1;
+                        if (_tempSize.y < 0.1) _tempSize.y = 0.1;
+                        if (_tempSize.z < 0.1) _tempSize.z = 0.1;
 
-                        obsBox.setFromCenterAndSize(center, size);
+                        obsBox.setFromCenterAndSize(_tempCenter, _tempSize);
                     }
 
                     if (showHitbox && obs.helper) {
@@ -241,7 +180,7 @@ export function updatePhysics(delta, moveDistance) {
                     // --- KIỂM TRA KIẾM CHÉM TRÚNG CHƯỚNG NGẠI ---
                     // Thanh kiếm được chém xuống chạm đất (hoặc vật cản) từ giây thứ 0.23 đến 0.5
                     if (isSwordSlashing && state.slashElapsedTime >= 0.23 && state.slashElapsedTime <= 0.5) {
-                        if (swordBox.intersectsBox(obsBox)) {
+                        if (_swordBox.intersectsBox(obsBox)) {
                             mesh.visible = false;
                             obs.activeType = 'none';
                             if (obs.helper) obs.helper.visible = false;
@@ -255,7 +194,7 @@ export function updatePhysics(delta, moveDistance) {
                     // --- XÉT VA CHẠM THÂN THỂ ---
                     if (state.isSusanooActive) {
                         // NẾU SUSANOO ĐANG BẬT, DÙNG HITBOX CỦA SUSANOO THAY VÌ SASUKE
-                        if (susanooBox.intersectsBox(obsBox)) {
+                        if (_susanooBox.intersectsBox(obsBox)) {
                             let isLargeObstacle = (obs.activeType === 'mountainWall') ||
                                 (obs.activeType === 'giantRock' && obs.hitboxCut && obs.hitboxCut.offsetY > 0) ||
                                 (obs.isFalling === true && obs.activeType === 'rock');
@@ -281,6 +220,7 @@ export function updatePhysics(delta, moveDistance) {
                             state.currentSpeed = 0; // Chết
                             let gameOverUI = document.getElementById('gameOverUI');
                             if (gameOverUI) gameOverUI.style.display = 'flex';
+                            pauseAllShurikens();
                         }
                     }
                 }

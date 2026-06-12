@@ -6,6 +6,7 @@ import { treeInstancedMeshes } from './environment.js';
 import { showHitbox, toggleHitboxes } from './physics.js';
 import { susanooBarContainer, susanooBarInner } from './ui.js';
 import { resetGame } from './logic.js';
+import { pauseAllShurikens, resumeAllShurikens } from './obstacles.js';
 
 export function setupInputs() {
     state.currentLane = 1; // Bắt đầu ở làn giữa (0: Trái, 1: Giữa, 2: Phải)
@@ -293,7 +294,7 @@ if (btnStartGame && startMenuUI) {
         }
 
         // 4. Pre-warm Audio (Ép trình duyệt giải mã âm thanh để tránh giật khi gọi play() lần đầu)
-        let audiosToWarm = [window.katonAudio, window.chidoriAudio, window.susanooSlashAudio];
+        let audiosToWarm = [window.katonAudio, window.chidoriAudio, window.susanooSlashAudio, window.shurikenAudio];
         audiosToWarm.forEach(audio => {
             if (audio) {
                 let p = audio.play();
@@ -321,8 +322,10 @@ if (btnPause) {
         if (window.bgmAudio) {
             if (isPaused) {
                 window.bgmAudio.pause();
+                pauseAllShurikens();
             } else {
                 window.bgmAudio.play().catch(e => console.log(e));
+                resumeAllShurikens();
             }
         }
     });

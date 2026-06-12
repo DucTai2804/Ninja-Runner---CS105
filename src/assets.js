@@ -226,3 +226,7 @@ window.fadeToVolume = function (audio, targetVol, durationMs = 150, pauseAfter =
         }, durationMs + 50);
     }
 };
+
+export const shurikenAudio = new Audio('audios/shuriken_extend.wav');
+shurikenAudio.volume = 0;
+window.shurikenAudio = shurikenAudio;
