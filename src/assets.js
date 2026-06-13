@@ -44,6 +44,10 @@ export const chidoriAudio = new Audio('audios/chidori.mp4');
 chidoriAudio.volume = 1.0;
 window.chidoriAudio = chidoriAudio;
 
+export const susanooEndAudio = new Audio('audios/susanoo_end.wav');
+susanooEndAudio.volume = 1.0;
+window.susanooEndAudio = susanooEndAudio;
+
 
 export const bgmAudio = new Audio('audios/rune_factory_3_ancient_bone.mp4');
 bgmAudio.volume = 0.15; // Để mức 15% để không lấn át tiếng hiệu ứng

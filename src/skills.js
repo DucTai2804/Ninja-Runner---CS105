@@ -1,7 +1,7 @@
 import { scene, camera, controls, renderer } from './core.js';
 import { fireTex } from './assets.js';
 import { state } from './state.js';
-import { sasuke, susanooModel, middleFingerBone, rightHandBone, susanooMixer, susanooSwordHitbox, sasukeModel, stopSusanooAnimation, susanooLight } from './character.js';
+import { sasuke, susanooModel, middleFingerBone, rightHandBone, susanooMixer, susanooSwordHitbox, sasukeModel, stopSusanooAnimation, susanooLight, playAnimation, sasukeAnimations, sasukeAnimList } from './character.js';
 import { treeInstancedMeshes } from './environment.js';
 import { GLSL_NOISE } from './utils.js';
 import { MAX_PARTICLES } from './config.js';
@@ -1163,7 +1163,27 @@ export function updateSkills(delta) {
             if (susanooLight) susanooLight.visible = false;
             if (sasukeModel) sasukeModel.visible = true; // Hiện lại Sasuke
             stopSusanooAnimation();
-            createFlameBlast(); // Bùng nổ lửa tím trắng xóa khi hết Susanoo
+            createSusanooAura(true); // Gọi hiệu ứng thu nhỏ và chảy ngược xuống
+            
+            // Kích hoạt nhảy và rớt từ trên đỉnh Susanoo xuống
+            state.isJumping = true;
+            state.isFallingFromSusanoo = true;
+            let jumpAnim = Object.keys(sasukeAnimations).find(k => k.includes('jump')) || sasukeAnimList[1]?.name || sasukeAnimList[0].name;
+            let action = playAnimation(jumpAnim, false);
+            if (action) {
+                state.jumpTimer = action.getClip().duration;
+                state.jumpDuration = state.jumpTimer;
+            } else {
+                state.jumpTimer = 1.0;
+                state.jumpDuration = 1.0;
+            }
+            
+            // Phát âm thanh susanoo_end.wav
+            if (window.susanooEndAudio) {
+                window.susanooEndAudio.currentTime = 0;
+                window.susanooEndAudio.play().catch(e => console.log(e));
+            }
+
             state.cameraTransitionTime = 1.0; // Bắt đầu chuyển đổi góc camera về Sasuke
 
             // Tắt âm thanh bay mượt mà (Có pause)
@@ -1226,33 +1246,46 @@ export function updateSkills(delta) {
         });
     }
 
-    // --- HIỆU ỨNG KHÓI BÙNG NỔ (SMOKE BLAST) ---
-    // Khôi phục lại delta thực tế cho khói để nó không bị ảnh hưởng bởi Slow Motion
-    let smokeDelta = state.isSusanooCutinActive ? delta * 20 : delta;
+    // --- HIỆU ỨNG CYLINDER AURA (TRỤ SÁNG) ---
+    // Khôi phục lại delta thực tế để không bị ảnh hưởng bởi Slow Motion
+    let auraDelta = state.isSusanooCutinActive ? delta * 20 : delta;
 
-    for (let i = activeBlasts.length - 1; i >= 0; i--) {
-        let b = activeBlasts[i];
-        b.life -= smokeDelta * 0.8; // Tốc độ biến mất chậm lại, tồn tại hơn 1s (qua mốc 0.5s)
+    for (let i = activeAuras.length - 1; i >= 0; i--) {
+        let b = activeAuras[i];
+        b.life -= auraDelta * 0.66; // Tồn tại 1.5s (1s chờ Susanoo + 0.5s sau khi xuất hiện)
 
-        // Tỏa rộng nhanh và khổng lồ để bằng kích thước Susanoo
-        b.group.scale.x += smokeDelta * 10;
-        b.group.scale.y += smokeDelta * 10;
-        b.group.scale.z += smokeDelta * 10;
+        // Cập nhật Uniforms cho Shader
+        let mat = b.group.material;
+        if (mat && mat.uniforms) {
+            mat.uniforms.time.value += auraDelta;
+            mat.uniforms.life.value = b.life;
+        }
 
-        b.group.children.forEach(smoke => {
-            // Khói mờ dần
-            smoke.material.opacity = b.life * 0.8;
-            // Khói vừa xoay quanh tâm vừa bay tản ra ngoài một chút
-            smoke.material.rotation += smokeDelta * 0.5;
-            if (smoke.userData && smoke.userData.velocity) {
-                smoke.position.addScaledVector(smoke.userData.velocity, smokeDelta);
+        if (b.isReversed) {
+            // Không thu hẹp nữa! Giữ nguyên độ rộng hoặc phình to ra một chút để khớp với âm thanh bùng nổ
+            if (b.group.scale.x < 15.0) {
+                b.group.scale.x += auraDelta * 5;
+                b.group.scale.z += auraDelta * 5;
             }
-        });
+            // Vẫn tiếp tục bốc lên cao
+            if (b.group.scale.y < 45.0) {
+                b.group.scale.y += auraDelta * 10; 
+            }
+        } else {
+            // Vươn lên cao siêu tốc, Nở ngang vừa phải
+            if (b.group.scale.x < 12) {
+                b.group.scale.x += auraDelta * 8;
+                b.group.scale.z += auraDelta * 8;
+            }
+            if (b.group.scale.y < 35) {
+                b.group.scale.y += auraDelta * 30; // Vươn lên cao
+            }
+        }
 
         if (b.life <= 0) {
             b.group.visible = false;
             b.active = false;
-            activeBlasts.splice(i, 1);
+            activeAuras.splice(i, 1);
         }
     }
 
@@ -1276,66 +1309,111 @@ export function updateSkills(delta) {
     }
 }
 
-// --- HIỆU ỨNG KHÓI BÙNG NỔ (SMOKE BLAST) THAY THẾ CONE BLAST ---
-const blastSmokeTex = createSmokeTexture(150, 50, 255); // Khói tím Susanoo
-const blastSmokeMatBase = new THREE.SpriteMaterial({
-    map: blastSmokeTex,
-    color: 0xffffff,
-    transparent: true,
-    opacity: 0.8,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false
-});
+// --- HIỆU ỨNG CYLINDER AURA (TRỤ SÁNG BIẾN DẠNG) THAY THẾ SMOKE BLAST ---
+const auraVertShader = `
+varying vec2 vUv;
+uniform float time;
+void main() {
+    vUv = uv;
+    vec3 pos = position;
+    
+    // Gợn sóng biến dạng dọc thân trụ
+    float dist = sin(pos.y * 10.0 - time * 10.0) * 0.15;
+    vec2 dir = normalize(pos.xz);
+    pos.x += dir.x * dist;
+    pos.z += dir.y * dist;
+    
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+}
+`;
 
-export const blastPool = [];
-export const MAX_BLASTS = 2; // Tối đa 2 vụ nổ khói cùng lúc
+const auraFragShader = `
+varying vec2 vUv;
+uniform float time;
+uniform float life;
+uniform vec3 color;
+uniform float direction;
+
+void main() {
+    vec2 uv = vUv;
+    uv.y -= time * 2.0 * direction; // Cuộn lên hoặc cuộn xuống tùy direction
+    
+    // Tạo vân sáng dọc (Streaks) đan xen
+    float streak = sin(uv.x * 30.0 + sin(uv.y * 5.0)) * 0.5 + 0.5;
+    float streak2 = sin(uv.x * 15.0 - time * 3.0) * 0.5 + 0.5;
+    float noise = streak * streak2;
+    
+    // Fade mờ ở đáy và đỉnh trụ
+    float fade = smoothstep(0.0, 0.2, vUv.y) * smoothstep(1.0, 0.4, vUv.y);
+    
+    // Tăng độ tương phản ánh sáng
+    float alpha = pow(noise, 1.5) * fade * life * 1.5;
+    
+    gl_FragColor = vec4(color, alpha);
+}
+`;
+
+const auraUniforms = {
+    time: { value: 0 },
+    life: { value: 1.0 },
+    color: { value: new THREE.Color(0xA200FF) }, // Tím sáng rực
+    direction: { value: 1.0 } // 1.0 là chảy lên, -1.0 là chảy xuống
+};
+
+const auraGeometry = new THREE.CylinderGeometry(1, 1, 1, 32, 16, true);
+auraGeometry.translate(0, 0.5, 0); // Dịch tâm xuống đáy để mọc thẳng từ dưới lên
+
+export const auraPool = [];
+export const MAX_BLASTS = 2; // Tối đa 2 trụ sáng cùng lúc
 
 for (let i = 0; i < MAX_BLASTS; i++) {
-    let group = new THREE.Group();
-    group.visible = false;
+    let mat = new THREE.ShaderMaterial({
+        vertexShader: auraVertShader,
+        fragmentShader: auraFragShader,
+        uniforms: THREE.UniformsUtils.clone(auraUniforms),
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide
+    });
     
-    // Thêm 12 sprite khói tạo thành một đám khói nổ
-    for(let j=0; j<12; j++) {
-        let smoke = new THREE.Sprite(blastSmokeMatBase.clone());
-        // Random vị trí ban đầu quanh tâm
-        smoke.position.set((Math.random()-0.5)*4, (Math.random()-0.5)*4 + 2, (Math.random()-0.5)*4);
-        smoke.scale.set(8, 8, 8); // Kích thước mỗi mảnh khói
-        smoke.material.rotation = Math.random() * Math.PI * 2;
-        
-        // Vận tốc tỏa ra
-        let vel = new THREE.Vector3(smoke.position.x, smoke.position.y - 2, smoke.position.z).normalize().multiplyScalar(2.0 + Math.random()*2.0);
-        smoke.userData = { velocity: vel, origPos: smoke.position.clone() };
-        
-        group.add(smoke);
-    }
-
-    blastPool.push({
-        group: group,
+    let mesh = new THREE.Mesh(auraGeometry, mat);
+    mesh.visible = false;
+    
+    auraPool.push({
+        group: mesh, // Ở đây mesh đóng vai trò là group luôn
         active: false,
         life: 1.0
     });
 }
 
-export let activeBlasts = [];
-export function createFlameBlast() {
-    let b = blastPool.find(bl => !bl.active);
+export let activeAuras = [];
+export function createSusanooAura(isReversed = false) {
+    let b = auraPool.find(bl => !bl.active);
     if (!b) return;
 
     b.active = true;
     b.group.visible = true;
     b.life = 1.0;
+    b.isReversed = isReversed;
     
-    // Reset scale & position của group
-    b.group.scale.set(1, 1, 1);
+    if (isReversed) {
+        // Bắt đầu với kích thước khổng lồ của Susanoo
+        b.group.scale.set(12, 35, 12);
+    } else {
+        // Bắt đầu với kích thước nhỏ (ngang Sasuke), hơi dẹt ở đáy
+        b.group.scale.set(1.5, 0.5, 1.5);
+    }
     b.group.position.y = 0;
     
-    // Reset từng hạt khói
-    b.group.children.forEach(smoke => {
-        smoke.position.copy(smoke.userData.origPos);
-        smoke.material.opacity = 0.8;
-    });
+    if (b.group.material && b.group.material.uniforms) {
+        b.group.material.uniforms.time.value = 0;
+        b.group.material.uniforms.life.value = 1.0;
+        // Luôn chảy lên trên (1.0) cho cả lúc bắt đầu và kết thúc
+        b.group.material.uniforms.direction.value = 1.0;
+    }
 
-    activeBlasts.push(b);
+    activeAuras.push(b);
 }
 
 // ==========================================
@@ -1368,13 +1446,13 @@ export function precompileShaders() {
 
     if (fireballPool.length > 0) prepareForCompile(fireballPool[0].group);
     
-    // Gắn blastPool vào sasuke lúc này mới an toàn
-    blastPool.forEach(b => {
+    // Gắn auraPool vào sasuke lúc này mới an toàn
+    auraPool.forEach(b => {
         if (sasuke && b.group.parent !== sasuke) {
             sasuke.add(b.group);
         }
     });
-    if (blastPool.length > 0) prepareForCompile(blastPool[0].group);
+    if (auraPool.length > 0) prepareForCompile(auraPool[0].group);
     if (particlePool.length > 0) {
         particlePool.forEach(p => {
             p.visible = true;
@@ -1428,7 +1506,7 @@ export function precompileShaders() {
     if (susanooModel) susanooModel.visible = wasSusanooVisible;
     
     if (fireballPool.length > 0) fireballPool.forEach(fb => fb.group.visible = false);
-    if (blastPool.length > 0) blastPool.forEach(b => b.group.visible = false);
+    if (auraPool.length > 0) auraPool.forEach(b => b.group.visible = false);
     if (particlePool.length > 0) particlePool.forEach(p => p.visible = false);
 
     fireLight.visible = false;

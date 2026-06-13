@@ -230,7 +230,7 @@ export function stopSusanooAnimation() {
     currentSusanooAction = null;
 }
 
-export const susanooLight = new THREE.PointLight(0x8A00FF, 0.0, 80); // Đặt cường độ 0
+export const susanooLight = new THREE.PointLight(0x8A00FF, 5.0, 120); // Tăng cường độ và bán kính để chiếu sáng không gian xung quanh
 
 gltfLoader.load('models/Characters/sasuke/susanoo_animation_clean.glb', function (gltf) {
     susanooModel = gltf.scene;

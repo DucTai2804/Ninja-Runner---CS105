@@ -1,7 +1,7 @@
 import { state } from './state.js';
 import { LANE_POSITIONS } from './config.js';
 import { playAnimation, sasukeAnimations, sasukeAnimList, susanooAnimations, susanooModel, sasukeHitbox, playSusanooAnimation, susanooLight } from './character.js';
-import { chidoriGroup, createFlameBlast } from './skills.js';
+import { chidoriGroup, createSusanooAura } from './skills.js';
 import { treeInstancedMeshes } from './environment.js';
 import { showHitbox, toggleHitboxes } from './physics.js';
 import { susanooBarContainer, susanooBarInner } from './ui.js';
@@ -150,6 +150,9 @@ export function setupInputs() {
                 state.isSusanooCutinActive = true;
                 triggerSkillAnimation(3);
 
+                // Kích hoạt hiệu ứng vụ nổ khói ngay khi bắt đầu bấm (tạo cảm giác bùng nổ bao trùm Sasuke trong lúc slowmo)
+                createSusanooAura();
+
                 // Phát âm thanh Cut-in
                 if (window.susanooActAudio) {
                     window.susanooActAudio.currentTime = 0;
@@ -161,11 +164,11 @@ export function setupInputs() {
                 if (cutin) {
                     cutin.style.opacity = '1';
                     cutin.style.transform = 'translate(-50%, -50%) scale(1)';
-                    // Mờ đi sau 0.4s để tạo cảm giác chớp nhoáng
+                    // Mờ đi sau 0.8s để tạo cảm giác chớp nhoáng nhưng đủ lâu trong 1s slowmo
                     setTimeout(() => {
                         cutin.style.opacity = '0';
                         cutin.style.transform = 'translate(-50%, -50%) scale(1.1)';
-                    }, 400); 
+                    }, 800); 
                 }
 
                 // Hiệu ứng Time Dilation cho Âm thanh (Làm chậm tiếng BGM)
@@ -174,7 +177,7 @@ export function setupInputs() {
                     window.bgmAudio.playbackRate = 0.3; // Chậm đi
                 }
 
-                // Chờ 0.5 giây rồi mới chính thức bật Susanoo
+                // Chờ 1.0 giây (1000ms) rồi mới chính thức bật Susanoo
                 setTimeout(() => {
                     // Trả lại tốc độ cho BGM
                     if (window.bgmAudio) {
@@ -187,9 +190,6 @@ export function setupInputs() {
                     
                     state.isSusanooCutinActive = false;
                     state.isSusanooActive = true;
-                    
-                    // Kích hoạt hiệu ứng vụ nổ khói khi Susanoo chính thức xuất hiện
-                    createFlameBlast();
 
                     if (susanooLight) susanooLight.visible = true; // Bật sáng Susanoo
                     
@@ -230,7 +230,7 @@ export function setupInputs() {
                         playSusanooAnimation(flyAnim, true, 0.2);
                     }
                 }
-                }, 500); // KẾT THÚC SETTIMEOUT 500ms
+                }, 1000); // KẾT THÚC SETTIMEOUT 1000ms
             } else if (!state.isSusanooSlashing) {
                 // Chờ hoạt ảnh chém xong mới cho phép chém tiếp
                 state.isSusanooSlashing = true;

@@ -44,13 +44,21 @@ export function updatePhysics(delta, moveDistance) {
 
         // Tính tỷ lệ % thời gian nhảy (từ 0.0 đến 1.0)
         let progress = 1.0 - (state.jumpTimer / state.jumpDuration);
-        // Dùng nửa vòng đầu của hàm Sin (tạo thành hình Parabol) để nhấc bổng nhân vật lên thêm tối đa 2 mét
-        sasuke.position.y = Math.sin(progress * Math.PI) * 2.0;
+        if (state.isFallingFromSusanoo) {
+            // Khi hết Susanoo, Sasuke rớt thẳng từ đỉnh (độ cao 20m) xuống đất
+            // Bắt đầu ở progress=0 -> y=20. Kết thúc ở progress=1 -> y=0.
+            // (1.0 - progress * progress) tạo cảm giác rớt nhanh dần do trọng lực
+            sasuke.position.y = 20.0 * (1.0 - progress * progress);
+        } else {
+            // Nhảy bình thường (nửa vòng Sin) lên cao 2m
+            sasuke.position.y = Math.sin(progress * Math.PI) * 2.0;
+        }
 
         if (sasuke.position.y < 0) sasuke.position.y = 0;
 
         if (state.jumpTimer <= 0) {
             state.isJumping = false;
+            state.isFallingFromSusanoo = false; // Reset trạng thái
             sasuke.position.y = 0;
 
             // Nếu đang slide dở khi nhảy xong, hoặc không làm gì thì về chạy
